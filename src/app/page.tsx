@@ -1,11 +1,24 @@
+"use client";
+
+import { useState } from "react";
+import { Header } from "@/components/layout/Header";
+import { PropertyFilters } from "@/components/search/PropertyFilters";
+import { DEFAULT_FILTERS } from "@/hooks/useFilteredProperties";
+
 export default function Home() {
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+
   return (
-    <main aria-label="Nagpur property results" className="min-h-screen bg-[var(--sat-canvas)] px-6 py-12">
-      <div className="mx-auto max-w-7xl rounded-xl border border-[var(--sat-border)] bg-white p-8">
-        <span className="text-3xl font-extrabold tracking-[-0.06em] text-[var(--sat-charcoal)]">SAT<span className="text-[var(--sat-red)]">12</span></span>
-        <h1 className="mt-12 text-3xl font-bold text-[var(--sat-charcoal)]">Properties in Nagpur</h1>
-        <p className="mt-2 text-[var(--sat-muted)]">Stage 1 foundation is ready for property search components.</p>
-      </div>
-    </main>
+    <>
+      <Header />
+      <PropertyFilters onChange={setFilters} onSearch={() => undefined} value={filters} />
+      <main aria-label="Nagpur property results" className="min-h-[calc(100vh-172px)] bg-white px-6 py-12">
+        <div className="mx-auto max-w-[1424px]">
+          <p className="text-sm text-zinc-500">Home / Buy Properties / Nagpur</p>
+          <h1 className="mt-4 text-3xl font-bold tracking-tight text-[var(--sat-charcoal)]">Properties in <span className="text-[var(--sat-red)]">Nagpur</span></h1>
+          <p className="mt-2 text-sm text-[var(--sat-muted)]">Find your next home, office or investment in Nagpur.</p>
+        </div>
+      </main>
+    </>
   );
 }
