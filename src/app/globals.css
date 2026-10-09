@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+:root {
+  --sat-red: #dc0011;
+  --sat-red-dark: #b8000e;
+  --sat-charcoal: #18181b;
+  --sat-muted: #71717a;
+  --sat-border: #e4e4e7;
+  --sat-canvas: #f7f7f8;
+  --sat-surface: #ffffff;
+  --background: var(--sat-surface);
+  --foreground: var(--sat-charcoal);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+}
+
+* { box-sizing: border-box; }
+html { background: var(--sat-canvas); }
+body { margin: 0; background: var(--sat-surface); color: var(--sat-charcoal); font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; }
+button, input, select { font: inherit; }
+button, a, input, select { outline-color: var(--sat-red); outline-offset: 3px; }
+::selection { background: #ffd9dc; color: var(--sat-charcoal); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
