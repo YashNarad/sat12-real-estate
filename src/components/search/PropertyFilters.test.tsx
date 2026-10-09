@@ -34,7 +34,9 @@ describe("PropertyFilters", () => {
     render(<FilterHarness />);
 
     await user.selectOptions(screen.getByRole("combobox", { name: /intent/i }), "Rent");
-    await user.click(screen.getByRole("button", { name: /clear filters/i }));
+    const clearButton = screen.getByRole("button", { name: /clear filters/i });
+    expect(clearButton).toHaveTextContent("Clear filters");
+    await user.click(clearButton);
 
     expect(screen.getByRole("status")).toHaveTextContent(JSON.stringify(DEFAULT_FILTERS));
   });

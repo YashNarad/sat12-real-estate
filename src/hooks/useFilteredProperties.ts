@@ -23,7 +23,8 @@ export function filterProperties(
     const matchesIntent = property.listingIntent === filters.intent;
     const matchesType = filters.propertyType === "All" || property.propertyType === filters.propertyType;
     const matchesBudget = filters.maxPrice === null || property.price <= filters.maxPrice;
-    const matchesBedrooms = filters.bedrooms === null || property.bedrooms === filters.bedrooms;
+    const matchesBedrooms = filters.bedrooms === null
+      || (filters.bedrooms === 4 ? property.bedrooms >= 4 : property.bedrooms === filters.bedrooms);
 
     return matchesQuery && matchesIntent && matchesType && matchesBudget && matchesBedrooms;
   });

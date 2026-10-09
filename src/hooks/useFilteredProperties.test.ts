@@ -21,11 +21,17 @@ const properties: Property[] = [
     longitude: 79.073, image: { src: "/images/properties/property-03.svg", alt: "Rental apartment", license: "SAT12 placeholder" },
     bedrooms: 2, bathrooms: 2, areaSqFt: 1100, status: "Ready to Move", reraApproved: false,
   },
+  {
+    id: "p4", title: "5 BHK Villa", listingIntent: "Buy", propertyType: "Villa",
+    price: 30_000_000, locality: "Besa", city: "Nagpur", latitude: 21.087,
+    longitude: 79.115, image: { src: "/images/properties/property-04.svg", alt: "Five bedroom villa", license: "SAT12 placeholder" },
+    bedrooms: 5, bathrooms: 5, areaSqFt: 4200, status: "Ready to Move", reraApproved: true,
+  },
 ];
 
 describe("filterProperties", () => {
   it("treats a whitespace-only query as no query", () => {
-    expect(filterProperties(properties, { ...DEFAULT_FILTERS, query: "  " })).toHaveLength(2);
+    expect(filterProperties(properties, { ...DEFAULT_FILTERS, query: "  " })).toHaveLength(3);
   });
 
   it("matches locality text without case sensitivity", () => {
@@ -37,7 +43,7 @@ describe("filterProperties", () => {
   });
 
   it("combines property type and bedroom filters with AND semantics", () => {
-    expect(filterProperties(properties, { ...DEFAULT_FILTERS, propertyType: "Villa", bedrooms: 4 }).map((property) => property.id)).toEqual(["p2"]);
+    expect(filterProperties(properties, { ...DEFAULT_FILTERS, propertyType: "Villa", bedrooms: 4 }).map((property) => property.id)).toEqual(["p2", "p4"]);
   });
 
   it("filters by real listing intent", () => {

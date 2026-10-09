@@ -30,7 +30,7 @@ export function PropertyResults({ properties, isLoading, selectedPropertyId, onS
   const toggleFavorite = (id: string) => setFavoriteIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
   if (isLoading) return <LoadingSkeleton />;
-  if (properties.length === 0) return <div className="grid min-h-[420px] place-items-center rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-6 text-center"><div><SearchX className="mx-auto text-zinc-400" size={36} /><h2 className="mt-4 text-xl font-semibold">No properties found</h2><p className="mt-2 text-sm text-zinc-500">Try changing your location, budget, or property type.</p><button className="mt-5 rounded-lg bg-[var(--sat-red)] px-5 py-3 text-sm font-semibold text-white" onClick={onClearFilters} type="button">Clear all filters</button></div></div>;
+  if (properties.length === 0) return <div aria-live="polite" className="grid min-h-[420px] place-items-center rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-6 text-center" role="status"><div><SearchX className="mx-auto text-zinc-400" size={36} /><h2 className="mt-4 text-xl font-semibold">No properties found</h2><p className="mt-2 text-sm text-zinc-500">Try changing your location, budget, or property type.</p><button className="mt-5 rounded-lg bg-[var(--sat-red)] px-5 py-3 text-sm font-semibold text-white" onClick={onClearFilters} type="button">Clear all filters</button></div></div>;
 
   return (
     <>

@@ -15,6 +15,7 @@ interface ListingsHeaderProps {
 export function ListingsHeader({ count, intent, sort, view, onSortChange, onViewChange }: ListingsHeaderProps) {
   return (
     <div className="mb-5">
+      <p aria-live="polite" className="sr-only" role="status">{count} {count === 1 ? "property" : "properties"} found</p>
       <nav aria-label="Breadcrumb" className="text-xs text-zinc-500">Home <span className="mx-2">›</span> {intent} Properties <span className="mx-2">›</span> Nagpur</nav>
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
         <div>

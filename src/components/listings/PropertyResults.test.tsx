@@ -35,6 +35,11 @@ describe("PropertyResults", () => {
     expect(screen.getByTestId("property-list")).toHaveAttribute("data-view", "list");
   });
 
+  it("announces the loaded result count", () => {
+    render(<PropertyResults properties={properties} isLoading={false} selectedPropertyId={null} onSelect={() => undefined} onClearFilters={() => undefined} />);
+    expect(screen.getByRole("status")).toHaveTextContent("2 properties found");
+  });
+
   it("eagerly loads the first above-the-fold property image", () => {
     render(<PropertyResults properties={properties} isLoading={false} selectedPropertyId={null} onSelect={() => undefined} onClearFilters={() => undefined} />);
     expect(screen.getByRole("img", { name: "Villa" })).toHaveAttribute("loading", "eager");

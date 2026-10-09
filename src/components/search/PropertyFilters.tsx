@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, SlidersHorizontal, X } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 import { DEFAULT_FILTERS } from "@/hooks/useFilteredProperties";
 import type { PropertyFiltersState } from "@/types/property";
 import { FilterButton } from "./FilterButton";
@@ -27,7 +27,7 @@ export function PropertyFilters({ value, onChange, onSearch }: PropertyFiltersPr
         <FilterButton label="Budget" onChange={(event) => update("maxPrice", event.target.value ? Number(event.target.value) : null)} value={value.maxPrice ?? ""}><option value="">Budget</option>{budgetOptions.map(([label, amount]) => <option key={amount} value={amount}>{label}</option>)}</FilterButton>
         <FilterButton label="Bedrooms" onChange={(event) => update("bedrooms", event.target.value ? Number(event.target.value) : null)} value={value.bedrooms ?? ""}><option value="">BHK</option><option value="1">1 BHK</option><option value="2">2 BHK</option><option value="3">3 BHK</option><option value="4">4+ BHK</option></FilterButton>
         <button aria-label="Clear filters" className="flex h-12 shrink-0 items-center gap-2 rounded-lg border border-[var(--sat-border)] px-4 text-sm font-medium text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50" onClick={() => onChange(DEFAULT_FILTERS)} type="button">
-          {value === DEFAULT_FILTERS ? <SlidersHorizontal size={17} /> : <X size={17} />}<span>More Filters</span>
+          <X size={17} /><span>Clear filters</span>
         </button>
         <button className="flex h-12 shrink-0 items-center gap-5 rounded-lg bg-[var(--sat-red)] px-7 text-sm font-semibold text-white hover:bg-[var(--sat-red-dark)]" type="submit">Search Properties<ArrowRight size={18} /></button>
       </form>
