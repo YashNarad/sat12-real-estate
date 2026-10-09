@@ -7,17 +7,18 @@ interface PropertyCardProps {
   property: Property;
   selected: boolean;
   favorite: boolean;
+  eagerImage?: boolean;
   view: "grid" | "list";
   onSelect: (id: string) => void;
   onToggleFavorite: (id: string) => void;
 }
 
-export function PropertyCard({ property, selected, favorite, view, onSelect, onToggleFavorite }: PropertyCardProps) {
+export function PropertyCard({ property, selected, favorite, eagerImage = false, view, onSelect, onToggleFavorite }: PropertyCardProps) {
   return (
     <article className={`relative overflow-hidden rounded-[10px] border bg-white transition-colors ${selected ? "border-[var(--sat-red)] ring-1 ring-[var(--sat-red)]" : "border-[var(--sat-border)] hover:border-zinc-300"} ${view === "list" ? "min-h-44" : ""}`} data-testid="property-card">
       <button aria-label={`View ${property.title} in ${property.locality}`} className={`block w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--sat-red)] ${view === "list" ? "sm:grid sm:grid-cols-[240px_1fr]" : ""}`} onClick={() => onSelect(property.id)} type="button">
         <span className={`relative block overflow-hidden ${view === "list" ? "h-48 sm:h-full" : "aspect-[1.72/1]"}`}>
-          <Image alt={property.image.alt} className="object-cover" fill sizes={view === "list" ? "240px" : "(min-width: 1280px) 22vw, (min-width: 768px) 40vw, 100vw"} src={property.image.src} />
+          <Image alt={property.image.alt} className="object-cover" fill loading={eagerImage ? "eager" : "lazy"} sizes={view === "list" ? "240px" : "(min-width: 1280px) 22vw, (min-width: 768px) 40vw, 100vw"} src={property.image.src} />
           {property.badge && <span className={`absolute left-3 top-3 rounded-md px-3 py-1 text-xs font-semibold ${property.badge === "Featured" ? "bg-[var(--sat-red)] text-white" : "bg-red-50 text-[var(--sat-red)]"}`}>{property.badge}</span>}
         </span>
         <span className="block p-4">

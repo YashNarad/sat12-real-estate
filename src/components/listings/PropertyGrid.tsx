@@ -11,5 +11,5 @@ interface PropertyGridProps {
 }
 
 export function PropertyGrid(props: PropertyGridProps) {
-  return <div className="property-grid" data-testid="property-list" data-view={props.view}>{props.properties.map((property) => <PropertyCard favorite={props.favoriteIds.has(property.id)} key={property.id} onSelect={props.onSelect} onToggleFavorite={props.onToggleFavorite} property={property} selected={props.selectedPropertyId === property.id} view={props.view} />)}</div>;
+  return <div className="property-grid" data-testid="property-list" data-view={props.view}>{props.properties.map((property, index) => <PropertyCard eagerImage={index === 0} favorite={props.favoriteIds.has(property.id)} key={property.id} onSelect={props.onSelect} onToggleFavorite={props.onToggleFavorite} property={property} selected={props.selectedPropertyId === property.id} view={props.view} />)}</div>;
 }
