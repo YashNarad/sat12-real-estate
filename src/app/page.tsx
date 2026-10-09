@@ -16,7 +16,7 @@ export default function Home() {
 
   return (
     <>
-      <Header />
+      <Header currentIntent={filters.intent} onIntentChange={(intent) => setFilters((current) => ({ ...current, intent, maxPrice: null }))} />
       <PropertyFilters onChange={setFilters} onSearch={() => undefined} value={filters} />
       <main aria-label="Nagpur property results" className="bg-white lg:p-3">
         <div className="mx-auto grid max-w-[1536px] lg:min-h-[calc(100vh-183px)] lg:grid-cols-[30%_70%]">

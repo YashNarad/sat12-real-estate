@@ -43,7 +43,7 @@ describe("PropertyFilters", () => {
 });
 
 it("renders the primary SAT12 navigation", () => {
-  render(<Header />);
+  render(<Header currentIntent="Buy" onIntentChange={() => undefined} />);
   const navigation = screen.getByRole("navigation", { name: /primary/i });
   for (const label of ["Buy", "Rent", "New Projects", "Builders", "Locations", "Insights"]) {
     expect(navigation).toHaveTextContent(label);

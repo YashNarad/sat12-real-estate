@@ -1,8 +1,15 @@
 import { Bell, ChevronDown, Heart } from "lucide-react";
 
-const navItems = ["Buy", "Rent", "New Projects", "Builders", "Locations", "Insights"];
+import type { ListingIntent } from "@/types/property";
 
-export function Header() {
+const deferredNavItems = ["New Projects", "Builders", "Locations", "Insights"];
+
+interface HeaderProps {
+  currentIntent: ListingIntent;
+  onIntentChange: (intent: ListingIntent) => void;
+}
+
+export function Header({ currentIntent, onIntentChange }: HeaderProps) {
   return (
     <header className="border-b border-[var(--sat-border)] bg-white">
       <div className="mx-auto flex h-[76px] max-w-[1536px] items-center gap-8 px-5 sm:px-8 lg:px-14">
@@ -10,10 +17,11 @@ export function Header() {
           SAT<span className="text-[var(--sat-red)]">12</span>
         </a>
         <nav aria-label="Primary" className="hidden h-full items-center gap-7 lg:flex">
-          {navItems.map((item, index) => (
-            <a className={`flex h-full items-center border-b-2 px-1 text-sm font-medium ${index === 0 ? "border-[var(--sat-red)] text-[var(--sat-charcoal)]" : "border-transparent text-zinc-600 hover:text-[var(--sat-charcoal)]"}`} href={`#${item.toLowerCase().replaceAll(" ", "-")}`} key={item}>
-              {item}
-            </a>
+          {(["Buy", "Rent"] as const).map((intent) => (
+            <button aria-pressed={currentIntent === intent} className={`flex h-full items-center border-b-2 px-1 text-sm font-medium ${currentIntent === intent ? "border-[var(--sat-red)] text-[var(--sat-charcoal)]" : "border-transparent text-zinc-600 hover:text-[var(--sat-charcoal)]"}`} key={intent} onClick={() => onIntentChange(intent)} type="button">{intent}</button>
+          ))}
+          {deferredNavItems.map((item) => (
+            <button aria-label={`${item} — coming soon`} className="flex h-full cursor-not-allowed items-center border-b-2 border-transparent px-1 text-sm font-medium text-zinc-400" disabled key={item} title="Coming soon" type="button">{item}</button>
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2 sm:gap-4">
