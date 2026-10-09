@@ -25,6 +25,18 @@ button, input, select { font: inherit; }
 button, a, input, select { outline-color: var(--sat-red); outline-offset: 3px; }
 ::selection { background: #ffd9dc; color: var(--sat-charcoal); }
 
+.results-pane { container-type: inline-size; }
+.property-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.property-grid[data-view="list"] { grid-template-columns: minmax(0, 1fr); }
+.map-placeholder {
+  background-color: #edf0ee;
+  background-image: linear-gradient(28deg, transparent 48%, rgba(255,255,255,.9) 49%, rgba(255,255,255,.9) 51%, transparent 52%), linear-gradient(112deg, transparent 47%, rgba(220,0,17,.12) 48%, rgba(220,0,17,.12) 50%, transparent 51%), linear-gradient(rgba(113,113,122,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(113,113,122,.1) 1px, transparent 1px);
+  background-size: 210px 190px, 270px 240px, 44px 44px, 44px 44px;
+}
+
+@container (min-width: 620px) { .property-grid[data-view="grid"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (min-width: 940px) { .property-grid[data-view="grid"] { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
