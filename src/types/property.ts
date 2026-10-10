@@ -5,7 +5,7 @@ export type PropertyStatus = "Ready to Move" | "Under Construction";
 export interface PropertyImage {
   src: string;
   alt: string;
-  license: "SAT12 placeholder";
+  license: "SAT12 placeholder" | "SAT12 generated illustrative image";
 }
 
 export interface Property {
