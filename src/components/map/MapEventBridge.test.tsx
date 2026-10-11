@@ -56,6 +56,14 @@ it("focuses a newly selected property only once", () => {
   expect(mocks.map.flyTo).toHaveBeenCalledOnce();
 });
 
+it("uses immediate focus when reduced motion is requested", () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
+  const selectedProperty = NAGPUR_PROPERTIES[0];
+  render(<MapEventBridge properties={NAGPUR_PROPERTIES} selectedProperty={selectedProperty} visible searchAsMapMoves={false} onBoundsChange={() => undefined} onMapReady={() => undefined} />);
+  expect(mocks.map.setView).toHaveBeenCalledWith([selectedProperty.latitude, selectedProperty.longitude], MAP_FOCUS_ZOOM);
+  expect(mocks.map.flyTo).not.toHaveBeenCalled();
+});
+
 it("registers working zoom, bounds, and reset controls", () => {
   let controls: MapControlsApi | null = null;
   const { rerender } = render(<MapEventBridge properties={[]} selectedProperty={null} visible searchAsMapMoves={false} onBoundsChange={() => undefined} onMapReady={(value) => { controls = value; }} />);
