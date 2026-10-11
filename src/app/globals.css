@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
+@import "react-leaflet-cluster/dist/assets/MarkerCluster.css";
 
 :root {
   --sat-red: #dc0011;
@@ -11,6 +12,61 @@
   --sat-surface: #ffffff;
   --background: var(--sat-surface);
   --foreground: var(--sat-charcoal);
+}
+
+.leaflet-container {
+  background: #f1f1f2;
+  font-family: inherit;
+}
+
+.sat-map-marker,
+.sat-map-cluster {
+  background: transparent;
+  border: 0;
+}
+
+.sat-map-marker span {
+  display: grid;
+  min-width: 64px;
+  min-height: 36px;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--sat-charcoal);
+  font-size: 12px;
+  font-weight: 750;
+  box-shadow: 0 4px 16px rgb(24 24 27 / 20%);
+}
+
+.sat-map-marker.is-selected span {
+  background: var(--sat-red);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgb(220 0 17 / 20%), 0 6px 18px rgb(24 24 27 / 24%);
+}
+
+.sat-map-cluster span {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: var(--sat-red);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 750;
+  box-shadow: 0 5px 18px rgb(24 24 27 / 24%);
+}
+
+.leaflet-marker-icon:focus-visible {
+  outline: 3px solid var(--sat-red);
+  outline-offset: 4px;
+}
+
+.leaflet-control-attribution {
+  color: #52525b;
+  font-size: 10px;
 }
 
 @theme inline {
