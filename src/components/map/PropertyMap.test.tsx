@@ -34,3 +34,13 @@ it("declares a client-only dynamic map boundary", async () => {
     expect.objectContaining({ ssr: false }),
   );
 });
+
+it("can be imported without browser globals", async () => {
+  const originalWindow = globalThis.window;
+  Reflect.deleteProperty(globalThis, "window");
+  try {
+    await expect(import("./PropertyMap")).resolves.toHaveProperty("PropertyMap");
+  } finally {
+    Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
+  }
+});

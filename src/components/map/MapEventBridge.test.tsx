@@ -4,6 +4,9 @@ import { NAGPUR_PROPERTIES } from "@/data/properties";
 import { MAP_FOCUS_ZOOM, NAGPUR_DEFAULT_BOUNDS } from "@/lib/mapConfig";
 import { MapEventBridge, type MapControlsApi } from "./MapEventBridge";
 
+let resizeCallback: ResizeObserverCallback | undefined;
+const disconnectResizeObserver = vi.fn();
+
 const mocks = vi.hoisted(() => {
   const map = {
     flyTo: vi.fn(), setView: vi.fn(), fitBounds: vi.fn(), zoomIn: vi.fn(), zoomOut: vi.fn(), invalidateSize: vi.fn(),
@@ -23,7 +26,13 @@ beforeEach(() => {
   mocks.events = {};
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { callback(0); return 1; });
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
-  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+  resizeCallback = undefined;
+  disconnectResizeObserver.mockClear();
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: ResizeObserverCallback) { resizeCallback = callback; }
+    observe() {}
+    disconnect() { disconnectResizeObserver(); }
+  });
   vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
 });
 
@@ -67,4 +76,14 @@ it("invalidates map size on mount and visibility changes", () => {
   const mountCalls = mocks.map.invalidateSize.mock.calls.length;
   rerender(<MapEventBridge {...props} visible />);
   expect(mocks.map.invalidateSize.mock.calls.length).toBeGreaterThan(mountCalls);
+});
+
+it("invalidates after observed container resizing and disconnects on unmount", () => {
+  const props = { properties: [], selectedProperty: null, searchAsMapMoves: false, onBoundsChange: () => undefined, onMapReady: () => undefined };
+  const { unmount } = render(<MapEventBridge {...props} visible />);
+  const beforeResize = mocks.map.invalidateSize.mock.calls.length;
+  act(() => resizeCallback?.([], {} as ResizeObserver));
+  expect(mocks.map.invalidateSize.mock.calls.length).toBeGreaterThan(beforeResize);
+  unmount();
+  expect(disconnectResizeObserver).toHaveBeenCalledOnce();
 });

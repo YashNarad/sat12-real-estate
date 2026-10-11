@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { Marker } from "react-leaflet";
 import type { Property } from "@/types/property";
 import { createPropertyIcon } from "./mapIcons";
@@ -11,7 +11,7 @@ interface PropertyMarkerProps {
   onSelect: (id: string) => void;
 }
 
-export function PropertyMarker({ property, selected, onSelect }: PropertyMarkerProps) {
+export const PropertyMarker = memo(function PropertyMarker({ property, selected, onSelect }: PropertyMarkerProps) {
   const icon = useMemo(() => createPropertyIcon(property, selected), [property, selected]);
   const label = `${property.title}, ${property.locality}, Nagpur`;
   return (
@@ -26,4 +26,4 @@ export function PropertyMarker({ property, selected, onSelect }: PropertyMarkerP
       zIndexOffset={selected ? 1000 : 0}
     />
   );
-}
+});

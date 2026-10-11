@@ -6,7 +6,7 @@ import { PropertyMapClient } from "./PropertyMapClient";
 
 vi.mock("react-leaflet", () => ({
   MapContainer: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <div data-testid="map-container" {...props}>{children}</div>,
-  TileLayer: ({ attribution, eventHandlers }: { attribution: string; eventHandlers?: { tileerror?: () => void } }) => <button data-testid="tiles" onClick={() => eventHandlers?.tileerror?.()}>{attribution}</button>,
+  TileLayer: ({ attribution, eventHandlers }: { attribution: string; eventHandlers?: { tileerror?: () => void; tileload?: () => void } }) => <><button data-testid="tiles" onClick={() => eventHandlers?.tileerror?.()}>{attribution}</button><button data-testid="tile-recovered" onClick={() => eventHandlers?.tileload?.()}>Tile loaded</button></>,
 }));
 vi.mock("react-leaflet-cluster", () => ({ default: ({ children }: React.PropsWithChildren) => <div data-testid="cluster">{children}</div> }));
 vi.mock("./PropertyMarker", () => ({ PropertyMarker: ({ property }: { property: { id: string } }) => <span data-testid={`marker-${property.id}`} /> }));
@@ -30,4 +30,13 @@ it("announces tile failure without removing map overlays", async () => {
   expect(screen.getByTestId("cluster")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Zoom in" })).toBeInTheDocument();
   expect(screen.getByText(/OpenStreetMap contributors/)).toBeInTheDocument();
+});
+
+it("removes the tile warning when tiles recover", async () => {
+  const user = userEvent.setup();
+  render(<PropertyMapClient properties={[]} selectedPropertyId={null} searchAsMapMoves={false} visible onSelect={() => undefined} onClearSelection={() => undefined} onSearchAsMapMovesChange={() => undefined} onBoundsChange={() => undefined} onViewProperty={() => undefined} />);
+  await user.click(screen.getByTestId("tiles"));
+  expect(screen.getByRole("status")).toBeInTheDocument();
+  await user.click(screen.getByTestId("tile-recovered"));
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });
