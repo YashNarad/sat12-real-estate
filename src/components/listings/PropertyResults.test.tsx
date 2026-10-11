@@ -25,6 +25,11 @@ describe("PropertyResults", () => {
     expect(onClearFilters).toHaveBeenCalledOnce();
   });
 
+  it("explains empty results caused by current map bounds", () => {
+    render(<PropertyResults emptyReason="map-bounds" properties={[]} isLoading={false} selectedPropertyId={null} onSelect={() => undefined} onClearFilters={() => undefined} />);
+    expect(screen.getByText(/move the map or turn off map search/i)).toBeInTheDocument();
+  });
+
   it("sorts properties by price and switches presentation", async () => {
     const user = userEvent.setup();
     render(<PropertyResults properties={properties} isLoading={false} selectedPropertyId={null} onSelect={() => undefined} onClearFilters={() => undefined} />);
