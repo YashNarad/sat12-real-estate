@@ -19,7 +19,7 @@
 - React Leaflet must load only through a Client Component containing `next/dynamic(..., { ssr: false })` at module scope.
 - `useFilteredProperties` remains independent of the mock data source; map bounds filter the output of that hook rather than importing `NAGPUR_PROPERTIES`.
 - Use `https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png` only for normal interactive viewing and keep visible `&copy; OpenStreetMap contributors` attribution.
-- Search-as-map-moves defaults off and updates bounds on `moveend`, never continuous `move`.
+- Search-as-map-moves defaults off and updates bounds on `moveend`, never continuous `move`; bounds narrow listings only, while markers always receive all ordinary-filter matches.
 - Do not add Supabase, authentication, payments, geocoding, routing, user-location permission, or persistent favorites.
 - Follow the installed Next.js 16.4 guidance in `node_modules/next/dist/docs/01-app/02-guides/lazy-loading.md` and `node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-client.md` before implementation.
 
@@ -50,6 +50,8 @@
 - A property exactly on a north/south/east/west bounds edge remains visible; covered in Task 2 bounds tests.
 - Turning map search off restores all filter-matched properties without changing ordinary filters; covered in Task 5 page tests.
 - Programmatic marker focus while map search is enabled does not enter a bounds/selection update loop; covered in Task 4 event-bridge tests.
+- Map visibility/container resizing schedules `invalidateSize()`; covered in Task 4 bridge tests.
+- Tile loading failure keeps overlays and attribution mounted and announces a non-blocking accessible status; covered in Tasks 4 and 6.
 - Filtering out the selected property clears the preview and selected marker; covered in Tasks 2 and 5.
 - Mobile card selection switches to Map, while preview “View property” returns to List without losing selection; covered in Task 5.
 
@@ -333,7 +335,7 @@ git commit -m "feat: add map controls preview and mobile toggle"
 
 **Interfaces:**
 - Consumes: `PropertyMapProps`, Task 2 map config/types, Task 3 controls/preview.
-- Produces: a functional map with tiles, clustered price markers, controlled selection, bounds events, focus, and reset.
+- Produces: a functional map with tiles, clustered price markers, controlled selection, bounds events, focus, reset, resize invalidation, and non-blocking tile-error status.
 
 - [ ] **Step 1: Write failing icon-factory tests**
 
@@ -348,10 +350,11 @@ Assert:
 - changing selected ID calls `flyTo([latitude, longitude], expectedZoom)` once.
 - repeated render with the same selected ID does not call `flyTo` again.
 - reset fits property bounds, or `NAGPUR_DEFAULT_BOUNDS` for an empty collection.
+- mounting/visibility changes and observed container resizes schedule `invalidateSize()`.
 
 - [ ] **Step 3: Write a failing map composition test**
 
-Mock `react-leaflet`, `react-leaflet-cluster`, `PropertyMarker`, and `MapEventBridge`. Render two properties and assert one tile layer, a cluster group, two markers, controls, and the selected property's preview. Assert the tile attribution contains “OpenStreetMap contributors.”
+Mock `react-leaflet`, `react-leaflet-cluster`, `PropertyMarker`, and `MapEventBridge`. Render two properties and assert one tile layer, a cluster group, two markers, controls, and the selected property's preview. Assert the tile attribution contains “OpenStreetMap contributors.” Trigger `tileerror` and assert an accessible, non-blocking status appears while the cluster, controls, preview, and attribution remain rendered.
 
 - [ ] **Step 4: Run the map tests and verify RED**
 
@@ -369,7 +372,7 @@ Render `Marker` with `[property.latitude, property.longitude]`, `keyboard`, `ris
 
 - [ ] **Step 7: Implement `MapEventBridge`**
 
-Use `useMapEvents({ moveend })` and `useMap()`. Convert Leaflet bounds immediately to plain `MapBounds`. Keep the previous selected ID in a ref so focus happens only on ID change. Detect `prefers-reduced-motion` and use `setView` instead of `flyTo`. Expose map operations through callback-registration props:
+Use `useMapEvents({ moveend })` and `useMap()`. Convert Leaflet bounds immediately to plain `MapBounds`. Keep the previous selected ID in a ref so focus happens only on ID change. Detect `prefers-reduced-motion` and use `setView` instead of `flyTo`. Observe the map container with `ResizeObserver` and schedule `map.invalidateSize()` after mount, visibility changes, and observed resizes, with cleanup on unmount. Expose map operations through callback-registration props:
 
 ```ts
 interface MapEventBridgeProps {
@@ -453,7 +456,7 @@ The mock must expose received property IDs and buttons that invoke `onSelect`, `
 2. Changing intent to Rent sends the same two rental IDs to both.
 3. Marker selection applies the selected card state.
 4. Card selection sends the selected ID to the map.
-5. Enabling map search and emitting bounds reduces both card and marker inputs.
+5. Enabling map search and emitting bounds reduces card inputs while marker inputs retain every ordinary-filter match.
 6. Disabling map search restores all filter-matched IDs.
 7. Filtering out the selected property clears map preview selection.
 8. On mobile state, card selection changes `ViewToggle` to Map; `onViewProperty` changes it to List without clearing selection.
@@ -478,8 +481,8 @@ const filterMatchedProperties = useFilteredProperties(NAGPUR_PROPERTIES, filters
 const [searchAsMapMoves, setSearchAsMapMoves] = useState(false);
 const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
 const [mobileView, setMobileView] = useState<MobileResultsView>("list");
-const visibleProperties = useMapBoundsFilter(filterMatchedProperties, mapBounds, searchAsMapMoves);
-const selection = usePropertySelection(visibleProperties);
+const listingProperties = useMapBoundsFilter(filterMatchedProperties, mapBounds, searchAsMapMoves);
+const selection = usePropertySelection(filterMatchedProperties);
 ```
 
 When disabling map search, set `mapBounds` to null. When receiving bounds, skip `setMapBounds` if `sameMapBounds(current, next)` is true. Preserve filter reset behavior and reset selection only through the selection hook's visibility rule.
@@ -488,7 +491,7 @@ Implement `useMediaQuery(query)` with `useState(false)` and an effect that calls
 
 - [ ] **Step 5: Replace the Stage 1 map placeholder without changing the desktop grid**
 
-Desktop remains `lg:grid-cols-[30%_70%]`. Render `PropertyMap` in the left aside and `PropertyResults` in the right section. Add `ViewToggle` above the two surfaces on mobile. Use `const isDesktop = useMediaQuery("(min-width: 1024px)")` and mount `PropertyMap` only when `isDesktop || mobileView === "map"`. Responsive classes make desktop show both, mobile show only the selected surface, and the mobile map use `min-h-[calc(100dvh-220px)]` with a practical fallback minimum.
+Desktop remains `lg:grid-cols-[30%_70%]`. Render `PropertyMap` with `filterMatchedProperties` in the left aside and `PropertyResults` with `listingProperties` in the right section. Add `ViewToggle` above the two surfaces on mobile. Use `const isDesktop = useMediaQuery("(min-width: 1024px)")` and mount `PropertyMap` only when `isDesktop || mobileView === "map"`. Responsive classes make desktop show both, mobile show only the selected surface, and the mobile map use `min-h-[calc(100dvh-220px)]` with a practical fallback minimum. Pass a visibility signal so the map invalidates its size after surface switches.
 
 - [ ] **Step 6: Wire card and marker selection**
 
@@ -545,21 +548,25 @@ Emit the same numeric bounds twice through the page mock and assert the visible 
 
 Assert the map loading fallback is a named status, mobile toggle pressed states are exposed, selected cards expose `aria-pressed`, marker titles include property/locality, and preview buttons have unambiguous names.
 
-- [ ] **Step 5: Add a failing performance contract test**
+- [ ] **Step 5: Add failing resize and tile-failure resilience tests**
+
+Mock `ResizeObserver` and animation-frame scheduling. Assert mount, a container resize, and a mobile visibility change schedule `invalidateSize()`, while unmount disconnects the observer. Trigger tile failure and assert the named status is announced without removing markers, controls, preview, or OpenStreetMap attribution.
+
+- [ ] **Step 6: Add a failing performance contract test**
 
 Mock the marker component and rerender `PropertyMapClient` with only preview open/close state changed. Assert marker IDs and count remain stable. Assert `move` is not registered while `moveend` is registered.
 
-- [ ] **Step 6: Make the smallest implementation corrections required by RED tests**
+- [ ] **Step 7: Make the smallest implementation corrections required by RED tests**
 
 Do not refactor unrelated Stage 1 components. Keep Leaflet objects inside map components and keep page state serializable.
 
-- [ ] **Step 7: Run the full automated suite and static checks**
+- [ ] **Step 8: Run the full automated suite and static checks**
 
 Run: `npm test && npm run lint && npm run typecheck`
 
 Expected: zero test failures; lint and TypeScript exit 0.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```powershell
 git add src
@@ -605,11 +612,11 @@ Confirm the approximately 30/70 layout, three result columns when container widt
 
 - [ ] **Step 4: Verify controlled map-search behavior**
 
-With map search off, pan/zoom and assert result count is unchanged. Enable it and assert the current bounds immediately filter both cards and markers. Pan to a different area and assert updates occur after movement ends. Disable it and assert all filter-matched results return. Repeat after selecting a property to confirm no update loop.
+With map search off, pan/zoom and assert result count is unchanged. Enable it and assert the current bounds immediately filter cards while all ordinary-filter-matched markers remain available for discovery. Pan to a different area and assert listing updates occur after movement ends without removing matching markers. Disable it and assert all filter-matched list results return. Repeat after selecting a property to confirm no update loop.
 
 - [ ] **Step 5: Verify filter and cluster synchronization**
 
-Switch Buy/Rent and apply property type/BHK/budget filters. Confirm result count, cards, and marker cluster children represent the same IDs. Click a cluster and confirm zoom-to-bounds reveals its markers without selecting an arbitrary property.
+Switch Buy/Rent and apply property type/BHK/budget filters. Confirm ordinary filters update cards and marker cluster children to the same candidate set; when map search is active, only the cards are the in-bounds subset. Click a cluster and confirm zoom-to-bounds reveals its markers without selecting an arbitrary property.
 
 - [ ] **Step 6: Verify 390×844 mobile List and Map views**
 

@@ -98,10 +98,9 @@ Derived collections are computed in this order:
 NAGPUR_PROPERTIES
     ↓ useFilteredProperties(filters)
 filterMatchedProperties
-    ↓ searchAsMapMoves && mapBounds ? filterPropertiesByBounds(...) : unchanged
-visibleProperties
-    ├─→ PropertyMap markers/clusters
-    └─→ PropertyResults cards/count/sort
+    ├─→ PropertyMap markers/clusters (all ordinary-filter matches)
+    └─→ searchAsMapMoves && mapBounds ? filterPropertiesByBounds(...) : unchanged
+         listingProperties → PropertyResults cards/count/sort
 ```
 
 Map bounds are plain numeric data:
@@ -115,9 +114,9 @@ export interface MapBounds {
 }
 ```
 
-The map emits bounds only after Leaflet's `moveend` event and only when “Search as I move the map” is enabled. Continuous `move` events do not update React state. Enabling the control immediately captures the current viewport; disabling it clears the bounds restriction and restores the complete filter-matched collection. This avoids render loops and prevents accidental result changes while users explore the map.
+The map always receives every property matching the ordinary filters, so markers remain discoverable while panning. The listing pane alone receives the intersection of ordinary-filter matches and the current map bounds. The map emits bounds only after Leaflet's `moveend` event and only when “Search as I move the map” is enabled. Continuous `move` events do not update React state. Enabling the control immediately captures the current viewport; disabling it clears the bounds restriction and restores the complete filter-matched listing collection. This avoids render loops without making off-screen matching markers disappear.
 
-If a filter or bounds change removes the selected property from `visibleProperties`, selection clears. Sorting never changes marker identity because all synchronization is ID-based.
+If an ordinary filter change removes the selected property from `filterMatchedProperties`, selection clears. A bounds-only change does not clear selection because the matching marker remains available on the map. Sorting never changes marker identity because all synchronization is ID-based.
 
 ## Selection and focus behavior
 
@@ -152,6 +151,8 @@ Cluster clicks use the cluster plugin's default zoom-to-bounds behavior. Cluster
 - Reset fits the complete `filterMatchedProperties` bounds when at least one property exists; otherwise it fits the default Nagpur bounds. When map-search is enabled, reset emits the resulting bounds after movement completes.
 - Individual markers display compact INR price labels. Selected markers use solid SAT12 red, white text, a stronger white halo, and a higher stacking order.
 - The map loading state uses the existing light-gray placeholder visual language and announces “Loading interactive map.”
+- The map calls `invalidateSize()` after becoming visible, after a mobile List/Map switch, and after relevant container resizing so Leaflet recalculates tiles and controls without stale gray areas.
+- Tile request failure displays a non-blocking `role="status"` message explaining that the background map could not load. Markers, controls, preview UI, keyboard access, and visible OpenStreetMap attribution remain mounted.
 
 ## Floating property preview
 
@@ -170,7 +171,8 @@ The preview is not a Leaflet popup. Keeping it as ordinary React UI avoids clipp
 - Default: off.
 - Off: panning and zooming never change cards or marker input.
 - On: the current viewport is captured immediately, then updated on `moveend` only.
-- Filter changes still run first; bounds filtering is always an intersection with the active property filters.
+- Filter changes still run first; bounds filtering is always an intersection with active property filters and applies only to the listing pane.
+- Markers and clusters continue to represent all ordinary-filter matches, including matching properties outside the current viewport.
 - Empty bounds results reuse the existing “No properties found” treatment with wording that suggests moving the map or disabling map search.
 - Reset and programmatic selected-marker focus do not create update loops; bounds callbacks compare numeric bounds before setting state.
 
@@ -201,13 +203,14 @@ A hydration-safe `useMediaQuery("(min-width: 1024px)")` hook returns `false` dur
 ## Performance and resilience
 
 - Dynamic import keeps Leaflet out of the server-rendered path and out of the mobile list view until needed.
-- Marker and cluster input uses the memoized `visibleProperties` array.
+- Marker and cluster input uses the memoized `filterMatchedProperties` array; listing input uses the separately memoized `listingProperties` array.
 - Icon creation is deterministic and memoized by price/selection state; no icon is rebuilt during unrelated page state changes.
 - Bounds updates occur on `moveend`, not every animation frame.
 - Cluster chunked loading is enabled to remain responsive when a future backend supplies larger arrays.
 - Event handlers are stable callbacks, and Leaflet listeners are registered through React Leaflet hooks so they are cleaned up on unmount.
 - Missing or empty property collections still render a usable Nagpur map and reset control.
-- Tile failure does not remove markers, controls, preview UI, or attribution; the base map may be blank while SAT12-owned overlays remain usable.
+- A `ResizeObserver` plus visibility-change signal schedules `invalidateSize()` rather than polling layout continuously.
+- Tile failure announces a concise, accessible, non-blocking status and does not remove markers, controls, preview UI, or attribution; the base map may be blank while SAT12-owned overlays remain usable.
 
 ## Testing strategy
 
@@ -218,7 +221,9 @@ A hydration-safe `useMediaQuery("(min-width: 1024px)")` hook returns `false` dur
 - `MapControls`: zoom/reset callbacks and controlled search-as-map-moves state.
 - `MapPreviewCard`: property metadata, close/view actions, and keyboard-accessible controls.
 - `ViewToggle`: correct pressed state and callbacks.
-- Page coordination with the Leaflet implementation mocked: filter-to-marker synchronization, listing selection switching mobile view, and bounds filtering affecting both list and map props.
+- Page coordination with the Leaflet implementation mocked: filter-to-marker synchronization, listing selection switching mobile view, ordinary filters affecting both surfaces, and map bounds affecting listing props only.
+- Resize handling: visibility and observed container-size changes call `invalidateSize()` without continuous polling.
+- Tile error handling: a tile error announces an accessible status while markers, controls, preview, and attribution remain present.
 - Client boundary: importing/rendering the page during Vitest must not evaluate Leaflet browser globals.
 
 ### Static and production verification
@@ -256,7 +261,7 @@ Save updated desktop and mobile screenshots under `docs/screenshots/` for review
 3. All filtered properties appear as clustered map markers using existing coordinates.
 4. Marker activation opens a floating preview; card activation highlights and focuses the corresponding marker.
 5. Zoom, reset, cluster expansion, and controlled search-as-map-moves behavior work without state loops.
-6. Filters, map bounds, listings, count, selection, sorting, favorites, and mobile view remain synchronized without changing the mock-data boundary.
+6. Ordinary filters synchronize markers and listings; map bounds narrow only listings while all ordinary-filter-matched markers remain discoverable.
 7. Mobile users can switch between usable Map and List surfaces, and card selection opens the selected property on the map.
 8. Keyboard, screen-reader, touch-target, focus, and reduced-motion requirements are met.
 9. OpenStreetMap attribution remains visible and tiles are used according to the standard interactive-use policy.
