@@ -4,7 +4,7 @@
 
 Stage 3 replaces the in-memory property source with a secure Supabase backend and adds authenticated property-management workflows without changing the approved SAT12 search, listing, map, or responsive presentation. The public experience must continue to consume the existing `Property[]` view model so Stage 2 filtering, marker clustering, map-bounds intersection, card selection, favorites, and mobile Map/List switching remain stable.
 
-This document is a planning artifact only. It does not authorize provisioning a Supabase project, applying migrations, changing production environment variables, or implementing backend code. Those actions begin only after the approval decisions near the end of this document are resolved.
+This document is a planning artifact only. Product decisions are resolved below, but it does not authorize provisioning a Supabase project, applying migrations, changing environment variables, or implementing backend code. Local implementation begins only after this revision is reviewed; remote provisioning and migration always require separate explicit approval.
 
 ## Existing Stage 2 baseline
 
@@ -13,7 +13,7 @@ This document is a planning artifact only. It does not authorize provisioning a 
 - `useFilteredProperties(properties, filters)` is data-source independent. It accepts `readonly Property[]` and applies query, Buy/Rent, property type, price, and bedroom filters.
 - The map receives every property matching ordinary filters; map bounds narrow only the listing pane. This distinction must remain intact.
 - `Property` contains the card/map fields: stable ID, title, listing intent, property type, price, locality, city, coordinates, primary image, bedrooms, bathrooms, area, construction status, RERA flag, and optional badge.
-- Nine Nagpur records and project-owned illustrative WebP images provide a deterministic fallback and local seed fixture.
+- Nine Nagpur records and project-owned illustrative WebP images provide deterministic local/staging fixtures only; production never presents them as real inventory or silently falls back to them.
 - Loading and filter/map empty states already exist, but there is no database error state.
 
 ## Recommended architecture
@@ -60,8 +60,8 @@ create type public.app_role as enum ('user', 'owner_agent', 'admin');
 create type public.listing_intent as enum ('buy', 'rent');
 create type public.property_type as enum ('apartment', 'villa', 'independent_house', 'plot');
 create type public.construction_status as enum ('ready_to_move', 'under_construction');
-create type public.listing_status as enum (
-  'draft', 'submitted', 'approved', 'rejected', 'published', 'archived'
+create type public.revision_status as enum (
+  'draft', 'submitted', 'approved', 'rejected', 'published', 'superseded'
 );
 create type public.approval_decision as enum ('approved', 'rejected');
 create type public.enquiry_status as enum ('new', 'contacted', 'closed', 'spam');
@@ -83,13 +83,32 @@ One row per `auth.users` record.
 
 A trigger creates a profile after an Auth user is created, copying only explicitly accepted metadata such as full name. Role always defaults to `user`. Role elevation is an administrator-only operation and cannot be derived from user-editable metadata.
 
-### `properties`
+### `role_audit_log`
+
+Append-only records contain target profile, previous/new roles, acting admin UUID or the literal bootstrap actor, reason, and timestamp. Authenticated clients cannot insert, update, or delete these records directly. AAL2 admins may read them; the bootstrap and role-change functions are the only writers.
+
+### `properties` — stable listing identity
 
 | Column | Type | Rules |
 |---|---|---|
 | `id` | `uuid` | PK, default `gen_random_uuid()` |
 | `owner_id` | `uuid` | not null, FK to `profiles(id)`, indexed |
-| `slug` | `text` | unique, immutable after publication |
+| `slug` | `text` | unique, immutable stable public URL key |
+| `published_revision_id` | `uuid` | nullable FK added after revision table creation |
+| `archived_at` | `timestamptz` | null while listing is active |
+| `retention_notice_sent_at`, `retention_not_before` | `timestamptz` | nullable retention guardrails |
+| `created_at`, `updated_at` | `timestamptz` | defaults and update trigger |
+
+The stable property row owns URL identity, ownership, enquiries, and the pointer to the currently public revision. It does not contain mutable listing content. Deleting or replacing a revision therefore cannot change the public URL or detach enquiries.
+
+### `property_revisions` — moderated listing content
+
+| Column | Type | Rules |
+|---|---|---|
+| `id` | `uuid` | PK, default `gen_random_uuid()` |
+| `property_id` | `uuid` | not null, FK to `properties(id)`, indexed |
+| `revision_number` | `integer` | positive, unique per property |
+| `replaces_revision_id` | `uuid` | nullable self-FK to the previously published revision |
 | `title`, `description` | `text` | constrained lengths; description required for submission |
 | `listing_intent` | `listing_intent` | not null |
 | `property_type` | `property_type` | not null |
@@ -103,29 +122,33 @@ A trigger creates a profile after an Auth user is created, copying only explicit
 | `rera_approved` | `boolean` | default false |
 | `rera_number` | `text` | optional; required by policy only when business rules demand it |
 | `badge` | `text` | nullable, constrained to `featured` or `new`; admin-controlled |
-| `status` | `listing_status` | not null, default `draft`, indexed |
+| `status` | `revision_status` | not null, default `draft`, indexed |
 | `rejection_reason` | `text` | admin-authored snapshot for owner UX |
+| `retention_notice_sent_at`, `retention_not_before` | `timestamptz` | nullable rejected-revision retention guardrails |
 | `submitted_at`, `approved_at`, `published_at` | `timestamptz` | lifecycle timestamps |
+| `created_by` | `uuid` | not null, FK to profile |
 | `created_at`, `updated_at` | `timestamptz` | defaults and update trigger |
 
-Indexes support public inventory and management queries: partial index on `(published_at desc)` where `status = 'published'`, `(owner_id, status, updated_at desc)`, filter indexes for intent/type/price/bedrooms, and GiST on `location`. Initial public queries return all published Nagpur properties and retain client-side filtering to preserve exact Stage 2 behavior. Server-side filter/RPC optimization is deferred until measured inventory size requires it.
+At most one non-terminal working revision (`draft`, `submitted`, `approved`, or `rejected`) may exist per property. A new draft for an already-published property is created only by `create_listing_revision(property_id)`, which clones the published revision and links `replaces_revision_id`. The public repository joins `properties.published_revision_id` to exactly one `published` revision and excludes `archived_at` rows. Publication atomically changes the approved revision to `published`, changes the prior published revision to `superseded`, and switches the stable pointer. No owner update can modify a `published`, `submitted`, `approved`, or `superseded` revision.
+
+Indexes support public inventory and management queries: the stable slug and published pointer, `(property_id, status, updated_at desc)`, filter indexes for intent/type/price/bedrooms on revisions, a unique partial working-revision index, and GiST on `location`. Initial public queries return all published Nagpur properties and retain client-side filtering to preserve exact Stage 2 behavior. Server-side filter/RPC optimization is deferred until measured inventory size requires it.
 
 ### `property_images`
 
 | Column | Type | Rules |
 |---|---|---|
 | `id` | `uuid` | PK |
-| `property_id` | `uuid` | FK with cascade, indexed |
+| `revision_id` | `uuid` | FK to `property_revisions` with cascade, indexed |
 | `storage_path` | `text` | unique object path, not a signed URL |
 | `alt_text` | `text` | required before submission |
-| `position` | `smallint` | 0–11, unique per property |
+| `position` | `smallint` | 0–11, unique per revision |
 | `width`, `height`, `size_bytes` | `integer` | positive metadata |
 | `mime_type` | `text` | allow JPEG, PNG, WebP |
 | `source_kind` | `text` | `owner_uploaded` or `sat12_illustrative` |
 | `created_by` | `uuid` | FK to profile |
 | `created_at` | `timestamptz` | default now |
 
-At least one image is required for submission. Position zero is the primary image mapped to the existing `Property.image`. A database constraint limits position; a transaction/RPC validates full submission requirements and prevents races that row-level checks alone cannot express.
+At least one image is required for submission. Position zero is the primary image mapped to the existing `Property.image`. Images are revision-scoped so a draft cannot mutate the currently published gallery. A database constraint limits position; a transaction/RPC validates full submission requirements and prevents races that row-level checks alone cannot express.
 
 ### `enquiries`
 
@@ -133,12 +156,13 @@ At least one image is required for submission. Position zero is the primary imag
 |---|---|---|
 | `id` | `uuid` | PK |
 | `property_id` | `uuid` | FK, indexed |
-| `sender_id` | `uuid` | nullable FK for authenticated users |
+| `property_revision_id_at_submission` | `uuid` | not null FK to the public revision seen by the sender |
+| `sender_id` | `uuid` | not null FK to authenticated profile |
 | `name`, `email`, `phone`, `message` | `text` | validated and length-limited |
 | `status` | `enquiry_status` | default `new` |
-| `created_at`, `updated_at` | `timestamptz` | defaults |
+| `created_at`, `updated_at`, `closed_at` | `timestamptz` | lifecycle timestamps |
 
-The initial recommendation is authenticated enquiries only, which reduces abuse and gives reliable ownership. Guest enquiries are an approval decision because they require CAPTCHA, rate limiting, retention rules, and an abuse-response process.
+Only authenticated users may create enquiries. The enquiry references the stable `property_id`, so it survives publication of later revisions. The submission function also records `property_revision_id_at_submission` for an immutable snapshot reference. Guest enquiries and Google OAuth are outside Stage 3.
 
 ### `listing_approvals`
 
@@ -148,13 +172,18 @@ Append-only moderation history.
 |---|---|---|
 | `id` | `uuid` | PK |
 | `property_id` | `uuid` | FK with restrict, indexed |
+| `revision_id` | `uuid` | FK with restrict to the exact reviewed revision |
 | `reviewer_id` | `uuid` | FK to admin profile |
 | `decision` | `approval_decision` | not null |
 | `notes` | `text` | required for rejection |
 | `property_snapshot` | `jsonb` | immutable reviewed-field snapshot |
 | `created_at` | `timestamptz` | default now |
 
-The current state stays on `properties.status`; `listing_approvals` is the audit trail. Approval/rejection is performed only through narrowly granted database functions that atomically validate the current state, insert the review event, change status/timestamps, and preserve a snapshot.
+Current moderation state stays on `property_revisions.status`; `listing_approvals` is the append-only audit trail for the exact revision reviewed. Approval/rejection is performed only through narrowly granted database functions that atomically validate the current state, insert the review event, change status/timestamps, and preserve a snapshot.
+
+### `legal_holds` and `retention_audit_log`
+
+`legal_holds` stores an entity kind, entity UUID, reason, creator, and release metadata. Only AAL2 admins can read or modify holds through audited functions. `retention_audit_log` records dry-run/execution batch ID, entity, action, result, actor, and timestamp and is append-only. Retention candidate and execution functions exclude any directly held entity plus dependent records protected by a held stable property.
 
 ## Authentication and roles
 
@@ -166,7 +195,13 @@ Roles:
 - `owner_agent`: all user permissions plus create drafts, manage owned editable listings/images, submit listings, and read enquiries for owned published listings.
 - `admin`: review all submitted listings, approve/reject/publish/archive, set badges, manage roles, and inspect enquiries required for moderation/support.
 
-Default signup role is `user`. Owner/agent and admin elevation require an existing admin through a protected database function. The recommended initial login methods are verified email/password and password recovery; social OAuth and MFA are separate future enhancements. Admin MFA can become mandatory before production launch if the selected Supabase plan supports the desired enforcement.
+Default signup role is `user`. Owner/agent elevation requires an existing administrator through a protected database function and an explicit approval record; self-service role escalation is impossible. Stage 3 supports verified email/password, logout, and password recovery. Google OAuth is deferred.
+
+Administrators must enroll a TOTP factor and present an `aal2` token before any admin page, role mutation, moderation function, approval-history access, or administrative enquiry access succeeds. Both application guards and database helpers check `auth.jwt()->>'aal' = 'aal2'`; an `admin` role at `aal1` is deliberately insufficient. Local pgTAP tests use AAL claims, and staging browser verification must prove enrollment, challenge, recovery, and rejection at AAL1. Production deployment is blocked until staging demonstrates reliable MFA enforcement and an emergency recovery procedure is documented.
+
+### First-administrator bootstrap
+
+The first admin cannot be created by an ordinary client or by user metadata. A one-time operator script runs only from a trusted workstation/CI environment with a service-role secret supplied through the process environment. It resolves one exact, email-confirmed Auth user, calls a service-role-only `bootstrap_first_admin(target_user_id)` function, and refuses to run when any admin already exists. The function records actor `bootstrap`, target UUID, timestamp, and reason in an immutable `role_audit_log`. The script never prints tokens and the service key never enters application runtime or browser bundles. After bootstrap, the user must enroll and verify TOTP before any admin operation; all later role changes require an existing AAL2 administrator. Production bootstrap requires an explicit runbook approval and credential rotation/revocation review after use.
 
 Authorization is checked in three places:
 
@@ -181,25 +216,26 @@ RLS is enabled on every public table. Policies specify `to anon` or `to authenti
 ### Profiles
 
 - Authenticated users select and update their own non-role profile fields.
-- Admins select profiles and change roles through `private.set_user_role(target_id, role)` only.
+- AAL2 admins select profiles and change roles through `private.set_user_role(target_id, role, reason)` only; every change appends to `role_audit_log`.
 - No client can directly update `profiles.role`.
 
-### Properties
+### Properties and revisions
 
-- `anon` and `authenticated`: select only rows with `status = 'published'`.
-- Owners: additionally select their own rows in every state.
-- Owners/agents: insert rows only with `owner_id = auth.uid()` and `status = 'draft'`.
-- Owners/agents: directly update/delete only owned `draft` or `rejected` rows; protected columns (`owner_id`, moderation status/timestamps, badge) are guarded by column grants and transition functions.
-- `submitted`, `approved`, and `published` rows are immutable to owners. Editing a published listing requires the explicit revision strategy selected before implementation.
-- Admin access is mediated by `private.is_admin()` with a fixed `search_path`, revoked public execution where appropriate, and accompanying pgTAP tests.
+- `anon` and `authenticated`: select active stable properties only through their `published_revision_id`, and select only that current published revision.
+- Owners: additionally select their own stable property and every revision belonging to it.
+- Owners/agents: create a stable property plus revision 1 only through `create_draft_listing`; `owner_id` is derived from `auth.uid()`.
+- Owners/agents: directly update/delete only owned `draft` or `rejected` revisions. Stable `owner_id`, slug, published pointer, moderation timestamps, status, and badge are guarded by column grants and lifecycle functions.
+- Owners create edits to a published listing only through `create_listing_revision`, which clones current published content/images into a new draft. The public pointer remains unchanged throughout review.
+- `submitted`, `approved`, `published`, and `superseded` revisions are immutable to owners. Rejection makes only that rejected revision editable.
+- Admin access is mediated by `private.is_aal2_admin()` with a fixed `search_path`, revoked public execution where appropriate, and accompanying pgTAP tests.
 
 ### Property images and Storage
 
-- Metadata visibility follows the parent property: public only for published properties; owner for owned properties; admin for all.
-- Owners insert/update/delete image metadata only for owned editable properties.
-- The private `property-images` bucket uses paths `{owner_uuid}/{property_uuid}/{image_uuid}.{ext}`.
-- Storage policies require the authenticated UID to match the first path segment and verify ownership/editable property state for upload/delete.
-- Public pages request short-lived signed URLs on the server only for published image rows. Owner/admin dashboards receive signed URLs for records they are authorized to see.
+- Metadata visibility follows the revision: public only for images on the stable property's current published revision; owner for owned revisions; AAL2 admin for all.
+- Owners insert/update/delete image metadata only for owned editable revisions.
+- The private `property-images` bucket uses paths `{owner_uuid}/{property_uuid}/{revision_uuid}/{image_uuid}.{ext}`.
+- Storage policies require the authenticated UID to match the first path segment and verify stable ownership plus editable revision state for upload/delete.
+- Public pages create short-lived signed URLs using the anonymous/caller-scoped server client only for the current published revision. Use a ten-minute URL lifetime with a server data-cache lifetime no longer than five minutes so cached pages do not routinely emit expired URLs. Owner/AAL2-admin dashboards receive signed URLs for rows their RLS identity may select.
 - The browser never receives a service-role key. Signed URLs are output capabilities with short expiry, not permanent database values.
 
 ### Enquiries
@@ -207,43 +243,47 @@ RLS is enabled on every public table. Policies specify `to anon` or `to authenti
 - Authenticated users insert enquiries with `sender_id = auth.uid()` against published properties.
 - Senders select their own enquiries.
 - Property owners select and update status for enquiries targeting their own properties.
-- Admins can inspect/update all enquiries.
+- AAL2 admins can inspect/update all enquiries.
 - No user may alter identity, property, or message fields after insert.
 
 ### Listing approvals
 
 - Owners can select approval history for their own properties.
-- Admins can select all reviews.
+- AAL2 admins can select all reviews.
 - Direct inserts/updates/deletes are denied; approve/reject functions create events atomically.
 
-Security-definer functions live in an unexposed `private` schema, set `search_path = ''`, schema-qualify every relation, validate caller role internally, and have execute privileges revoked from `public` unless explicitly required. The service-role key is never prefixed with `NEXT_PUBLIC_`, never committed, and is not needed by routine application paths.
+Security-definer functions live in an unexposed `private` schema, set `search_path = ''`, schema-qualify every relation, validate caller role and AAL internally, and have execute privileges revoked from `public` unless explicitly required. The service-role key is never prefixed with `NEXT_PUBLIC_`, never committed, and is not needed by routine application paths. The sole Stage 3 use is the explicit first-admin bootstrap operator script; local fixture scripts use local-only credentials.
 
 ## Listing lifecycle
 
 ```text
-draft ──submit──> submitted ──approve──> approved ──publish──> published
-  ▲                    │                      │                    │
-  └────edit rejected<──┴──reject─────────────┘                    └──archive──> archived
+stable property ──points to──> published revision N
+       │                            ▲
+       └─create revision N+1        │ atomic pointer swap on publish
+              draft -> submitted -> approved -> published
+                ▲          │                       │
+                └─rejected─┘        prior published└-> superseded
 ```
 
-- **Draft:** owner can edit fields and images.
+- **Draft:** owner can edit fields and revision-scoped images. For a published listing, it is a private clone and does not affect the public revision.
 - **Submitted:** immutable to owner; visible in admin review queue.
 - **Rejected:** owner sees required notes, can edit, and resubmit. Old approval events remain immutable.
 - **Approved:** moderation passed but not publicly visible. This separation supports scheduled/manual publication and a final admin check.
-- **Published:** visible to anonymous users and public search/map queries.
-- **Archived:** removed from public inventory but retained for audit and existing enquiries.
+- **Published:** visible only when referenced by the stable property's `published_revision_id`.
+- **Superseded:** immutable former public revision retained for moderation and enquiry context.
+- **Archived property:** `archived_at` removes the stable listing from public inventory while retaining its revisions, URL identity, enquiries, and audit records according to retention rules.
 
-Submission, approval, rejection, publication, and archival are database functions, not arbitrary status updates. Every transition checks source state and role, stamps timestamps, and returns the updated row. Concurrent or repeated transitions fail cleanly.
+Draft creation, revision cloning, submission, approval, rejection, publication, and archival are database functions, not arbitrary status updates. Every transition locks the stable property and target revision, checks source state/ownership/role/AAL, stamps timestamps, and returns the updated row. Concurrent or repeated transitions fail cleanly. Publication performs one transaction: confirm the approved revision belongs to the property, supersede the old public revision, publish the new one, and update `published_revision_id`. A revision can never become public through a direct update.
 
-The recommended published-edit strategy is **copy-on-revision**: keep the published row immutable, create a new draft linked by `revision_of`, review it, then atomically supersede the old published version. This prevents unreviewed edits from appearing publicly but adds schema and UI work; it requires approval before implementation.
+The approved published-edit strategy is **copy-on-revision**. The stable property ID and slug never change, so public URLs, enquiries, and listing-level history remain attached while revision-specific content and images pass through a fresh moderation cycle.
 
 ## Image upload workflow
 
-1. Owner creates a draft property and receives its UUID.
+1. Owner creates a stable property plus editable revision and receives both UUIDs.
 2. Client validates count, MIME type, and size, then requests upload through the authenticated Supabase client.
-3. Storage RLS permits a unique object path only under the owner's/property's prefix.
+3. Storage RLS permits a unique object path only under the owner's/property/revision prefix.
 4. After upload, a Server Action validates object metadata and inserts `property_images` metadata under database RLS.
-5. Removal deletes metadata and object only while the property is editable.
+5. Removal deletes metadata and object only while the revision is editable.
 6. Submission verifies one to twelve complete images and alt text.
 
 Bucket policy allows JPEG, PNG, and WebP up to 5 MB each. Standard uploads are appropriate below 6 MB. Images use new immutable paths instead of upsert to avoid stale CDN content. Server-side image transformation/moderation is not included in the first Stage 3 slice; generated Stage 2 images remain clearly labelled illustrative seed data.
@@ -301,12 +341,12 @@ Local development uses the Supabase CLI and a Docker-compatible runtime:
 
 ```text
 npx supabase start
-npx supabase db reset
+npx supabase db reset --local
 npx supabase gen types typescript --local > src/types/database.generated.ts
 npm run dev
 ```
 
-Commit `supabase/config.toml`, timestamped migrations, seed data, database tests, and generated TypeScript types. Ignore `supabase/.temp/` and `supabase/.branches/`. Use explicit `--local` or `--linked` flags for potentially ambiguous CLI commands. Never run destructive `db reset --linked` against production.
+Commit `supabase/config.toml`, timestamped migrations, seed data, database tests, and generated TypeScript types. Ignore `supabase/.temp/` and `supabase/.branches/`. Use explicit `--local` for development resets and tests, and explicit `--linked` only for reviewed forward migration commands against the intended staging/production project. Never run `db reset --linked` against any remote project.
 
 ## Migrations and seed strategy
 
@@ -318,7 +358,21 @@ Use forward-only reviewed SQL migrations:
 4. Storage bucket and object policies.
 5. Seed fixtures for local Auth users and the nine Nagpur properties/images metadata.
 
-The nine project-owned WebP files stay in `public/` for the Stage 2 baseline and tests. Local seed setup uploads/copies equivalent fixtures into Storage through a repeatable seed script; production seed data is applied only when explicitly approved. Every migration must replay from empty state with `npx supabase db reset` and generated types must match the resulting schema.
+The nine project-owned WebP files stay in `public/` for the Stage 2 baseline and tests. Local and staging seed setup uploads/copies equivalent fixtures into Storage through a repeatable, environment-guarded seed script. The script must refuse a production project reference, and no illustrative listing seed is ever applied to production. Every migration must replay from empty state with `npx supabase db reset --local` and generated types must match the resulting schema.
+
+## Provisional retention and privacy workflows
+
+These periods are approved as provisional engineering defaults and remain subject to legal review:
+
+| Data | Eligibility | Safe action |
+|---|---|---|
+| Rejected draft revisions | 90 days after last activity | Send owner notice, set `retention_not_before`, then delete revision content/images only after the notice window; never delete the stable property if it has published history or enquiries |
+| Archived listings | 2 years after `archived_at` | Anonymize owner-facing descriptive/PII fields and remove non-required images; retain stable ID/slug tombstone and required audit/enquiry references |
+| Unused images | 30 days after becoming unreferenced | Mark candidate, re-check references in the deletion transaction, delete Storage object, then metadata; retry object failures without deleting metadata first |
+| Closed enquiries | 12 months after closure | Anonymize name/email/phone/message while retaining property, timestamps, status, and aggregate-safe identifiers |
+| Approval history | 3 years | Retain immutable decision/snapshot until expiry, then apply the legally approved anonymization/deletion rule without breaking revision integrity |
+
+Implementation provides `retention_candidates(as_of)` and AAL2-admin `apply_retention(candidate_ids, dry_run)` functions, an append-only `retention_audit_log`, idempotency, legal-hold exclusion, dry-run reports, and batch limits. Automatic production scheduling remains disabled until legal approves the periods, notice language/delivery, legal-hold rules, and whether approval snapshots may be deleted or must be anonymized. No cascade may remove enquiries or moderation history earlier than its own retention rule.
 
 ## Testing and security verification
 
@@ -332,9 +386,13 @@ Use pgTAP under `supabase/tests/` to verify:
 - Owners can mutate only their own editable listings and image paths.
 - Submitted/published listings cannot be altered by owners.
 - Admin transitions create immutable approval history.
+- AAL1 admins are denied every privileged function; AAL2 admins succeed.
+- First-admin bootstrap refuses unconfirmed targets and refuses every run after an admin exists.
 - Enquiry sender/owner/admin visibility is correct.
 - Storage policies reject cross-owner paths and unpublished unauthorized reads.
 - Invalid transitions and concurrent/repeated approvals fail.
+- Revision publication swaps the stable pointer atomically and never exposes a draft/approved revision.
+- Retention dry-runs are non-mutating; execution is idempotent, legal-hold aware, and preserves referential history.
 
 Run with `npx supabase test db` against the local stack.
 
@@ -345,7 +403,7 @@ Run with `npx supabase test db` against the local stack.
 - Server Action tests cover validation, unauthenticated, wrong-role, RLS rejection, and success.
 - Existing 50 Stage 2 tests remain green with repository data.
 - Page tests distinguish route loading, database failure, no published inventory, filter empty, and map-bounds empty.
-- Browser tests cover sign-up/login/logout, owner draft/upload/submit, admin approve/publish, and public listing/map appearance.
+- Browser tests cover sign-up/login/logout/recovery, owner approval, owner draft/upload/submit, TOTP enrollment/challenge, AAL1 admin rejection, AAL2 admin approve/publish, revision swap at the same public URL, and public listing/map appearance.
 
 ### CI and deployment gates
 
@@ -368,7 +426,7 @@ Add secret scanning, migration linting, generated-type drift detection, and a ch
 
 1. **Foundation:** CLI config, schema, migrations, generated types, seed data, pgTAP. No runtime UI change.
 2. **Read path:** server repository and `PropertyExplorer` extraction behind a temporary data-source flag; preserve Stage 2 behavior and compare mock/live output.
-3. **Auth/profile:** cookie SSR clients, Proxy refresh, login/recovery, profile bootstrap, protected route shell.
+3. **Auth/profile:** cookie SSR clients, Proxy refresh, login/recovery, first-admin bootstrap, TOTP/AAL2 admin enforcement, profile bootstrap, protected route shell.
 4. **Owner management:** dashboard, draft create/edit, private image upload, validation, submission.
 5. **Admin moderation:** review queue, approval/rejection/publish functions, audit history.
 6. **Enquiries:** authenticated lead submission and owner/admin inbox.
@@ -376,18 +434,39 @@ Add secret scanning, migration linting, generated-type drift detection, and a ch
 
 Each slice is independently testable and committed separately. The Stage 2 public page remains runnable throughout; the data-source switch occurs only after live data parity tests pass.
 
-## Decisions requiring approval before implementation
+## Approved product decisions
 
-1. **Owner onboarding:** recommended admin approval before changing `user` to `owner_agent`; alternative is self-service owner registration with later verification.
-2. **Authentication methods:** recommended verified email/password plus recovery for Stage 3; decide whether Google OAuth is required now.
-3. **Guest enquiries:** recommended authenticated-only initially; enabling guests requires CAPTCHA, rate limiting, retention, and consent copy.
-4. **Published edits:** recommended copy-on-revision; simpler alternative unpublishes the listing during edits, while direct edits are not recommended.
-5. **Approval versus publication:** recommended separate `approved` and `published` states; decide whether approval should publish immediately.
-6. **Image privacy:** recommended private bucket with short-lived signed URLs; public bucket is simpler but can expose unapproved images to anyone with a URL.
-7. **Admin security:** decide whether MFA is mandatory at launch and which account creates the first admin.
-8. **Deployment topology:** identify Supabase development, staging, and production projects and the hosting provider that will receive environment variables.
-9. **Data retention:** define retention/deletion periods for rejected drafts, archived listings, images, profiles, and enquiries.
-10. **Seed publication:** confirm whether the nine illustrative Nagpur properties should appear in production or remain local/staging fixtures only.
+1. Owner/agent elevation requires AAL2-admin approval.
+2. Stage 3 authentication is verified email/password plus recovery; Google OAuth is deferred.
+3. Enquiries require an authenticated user.
+4. Published edits use copy-on-revision with stable listing IDs/slugs, enquiry links, and moderation history.
+5. Approval and publication are separate AAL2-admin actions.
+6. Property images use a private bucket and short-lived signed URLs.
+7. Admin MFA is mandatory before production; inability to verify it blocks deployment.
+8. Development uses local Supabase; staging and production are separate remote projects; remote reset is prohibited.
+9. Retention periods use the provisional table above, safe deletion/anonymization, and legal review before production automation.
+10. Nine illustrative Nagpur listings are local/staging fixtures only and are prohibited in production.
+
+## Implementation prerequisites and external blockers
+
+- **Available before remote provisioning:** Docker-compatible runtime, Node/npm, local Supabase CLI, the existing local images, and this repository are sufficient for Tasks 1–9 local work.
+- **Required for staging:** an explicitly provisioned staging Supabase project/reference, public URL/publishable key, protected database/service credentials in the deployment secret store, configured Auth redirect URLs/email delivery, and a staging hosting URL. These are not provisioned by this plan.
+- **Required for production:** a separate explicitly provisioned production Supabase project, production hosting environment, verified email provider/domain, backup/restore ownership, monitoring, first-admin identity, secure bootstrap operator, TOTP recovery procedure, and successful staging MFA/security evidence. Remote provisioning needs explicit user approval.
+- **Legal blocker:** automatic production retention/purge stays disabled until counsel approves periods, notice language/delivery, legal holds, enquiry anonymization, and approval-history disposition. Manual deletion must also honor holds and audit logging.
+- **Operational blocker:** production launch is blocked if AAL2 cannot be enforced in both database policies/functions and browser flows, or if the initial admin cannot enroll/recover MFA safely.
+
+## Consistency review
+
+- **Schema:** stable listing identity is separated from moderated revisions. Enquiries reference the stable property and capture the revision seen at submission; images and approvals reference exact revisions. Circular published-pointer creation is handled by an ordered FK migration.
+- **Lifecycle:** owners can change only draft/rejected revisions. Approval does not publish. Publication locks the property/revisions and atomically supersedes the prior revision plus swaps one stable pointer. Direct status/pointer writes are denied.
+- **RLS:** owner identity comes from `auth.uid()`, never input. Role comes from the protected profile, never user metadata. Every admin path requires both role `admin` and JWT `aal2`. Cross-owner and cross-revision operations are denied in table, function, and Storage tests.
+- **Images:** draft and public galleries cannot share mutable metadata. Signed URLs are created only after caller-scoped RLS selection, expire after ten minutes, and are cached for at most five minutes. Object deletion is finalized only after eligibility is rechecked.
+- **Admin bootstrap/MFA:** one service-role-only bootstrap is audited and self-disabling after the first admin. It grants the role but not administrative access until TOTP produces AAL2. Production remains blocked until staging verifies enrollment, challenge, denial, and recovery.
+- **Retention:** candidate calculation, holds, notices, anonymization/deletion, retries, and audit are explicit. No automatic production schedule exists before legal review; approval-history disposition deliberately fails closed pending that decision.
+- **Stage 2 preservation:** database rows map to the existing `Property[]`; filters remain client-side initially; markers receive all ordinary-filter matches and map bounds narrow only listings.
+- **Migration/deployment:** migrations are forward-only, local resets are explicitly local, illustrative data is blocked from production, and no remote resource or migration is authorized by this document.
+
+The review found no unresolved internal contradiction after adopting the stable-property/versioned-revision split. Remaining blockers are external/operational or legal and are listed above; they do not require weakening RLS or changing the Stage 2 UI.
 
 ## Acceptance criteria
 
@@ -400,6 +479,9 @@ Each slice is independently testable and committed separately. The Stage 2 publi
 7. Database loading, error, inventory-empty, filter-empty, and map-empty states are distinct and accessible.
 8. Migrations recreate the local environment, generated types are current, and database/application/browser/security checks pass.
 9. Deployment uses staging verification and forward-only migration discipline.
+10. Published revisions retain one stable public URL and cannot bypass submission, approval, and publication.
+11. AAL1 administrators cannot perform privileged reads or mutations; production remains blocked until AAL2 is verified in staging.
+12. Retention actions are dry-run capable, idempotent, audited, legal-hold aware, and not automatically scheduled before legal approval.
 
 ## Explicit non-goals
 
