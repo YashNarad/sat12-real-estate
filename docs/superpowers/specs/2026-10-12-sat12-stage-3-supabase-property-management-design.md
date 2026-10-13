@@ -13,7 +13,7 @@ This document is a planning artifact only. Product decisions are resolved below,
 - `useFilteredProperties(properties, filters)` is data-source independent. It accepts `readonly Property[]` and applies query, Buy/Rent, property type, price, and bedroom filters.
 - The map receives every property matching ordinary filters; map bounds narrow only the listing pane. This distinction must remain intact.
 - `Property` contains the card/map fields: stable ID, title, listing intent, property type, price, locality, city, coordinates, primary image, bedrooms, bathrooms, area, construction status, RERA flag, and optional badge.
-- Nine Nagpur records and project-owned illustrative WebP images provide deterministic local/staging fixtures only; production never presents them as real inventory or silently falls back to them.
+- Nine Nagpur records and project-owned illustrative WebP images provide deterministic Development/Test/Staging fixtures only; Production never presents them as real inventory or silently falls back to them.
 - Loading and filter/map empty states already exist, but there is no database error state.
 
 ## Recommended architecture
@@ -324,29 +324,41 @@ For the initial launch, filtering remains client-side to preserve behavior. A la
 - Auth/session expiry redirects protected routes to login with a safe relative return path.
 - Image upload failures remain retryable and do not discard the draft.
 
-## Environment and local development
+## Docker-free cloud development
 
 Commit `.env.example` with names only:
 
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_PROJECT_REF=
+SUPABASE_TEST_PROJECT_REF=
+SUPABASE_ACCESS_TOKEN=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_DB_PASSWORD=
+SUPABASE_TEST_DB_URL=
 ```
 
-Only the first two values are browser-safe. `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_DB_PASSWORD` are optional operational secrets for trusted scripts/CI and must never be imported by Client Components or exposed through Server Action responses. Add `server-only` guards to privileged modules. Existing `.env*` ignore rules remain; `.env.example` must be explicitly unignored.
+Only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are browser-safe. Project references are identifiers but still remain environment-specific. `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, and `SUPABASE_SERVICE_ROLE_KEY` are operational secrets for a developer shell, OS credential store, or protected CI secret store; they must never be imported by Client Components, printed, committed, or exposed through Server Action responses. Add `server-only` guards to privileged modules. Existing `.env*` ignore rules remain; `.env.example` is explicitly unignored and contains names only.
 
-Local development uses the Supabase CLI and a Docker-compatible runtime:
+Stage 3 uses no Docker runtime and no local Supabase containers. Each developer connects the checked-out migrations to an explicitly approved, dedicated Supabase Cloud **Development** project. Destructive migration replay and tests that need an empty database use a separate disposable/replaceable Supabase Cloud **Test** project (or an isolated Supabase preview branch when separately approved and available). Development, Test, Staging, and Production have different project references, credentials, Auth users, Storage contents, and deployment approvals.
+
+After the user approves the exact Development/Test project references and the operation, the Docker-free CLI flow is:
 
 ```text
-npx supabase start
-npx supabase db reset --local
-npx supabase gen types typescript --local > src/types/database.generated.ts
+npx supabase login
+npx supabase link --project-ref <approved-development-project-ref>
+npx supabase migration list --linked
+npx supabase db push --linked --dry-run
+npx supabase db push --linked
+npx supabase gen types typescript --project-id <approved-development-project-ref> --schema public > src/types/database.generated.ts
+npm run test:db:cloud
 npm run dev
 ```
 
-Commit `supabase/config.toml`, timestamped migrations, seed data, database tests, and generated TypeScript types. Ignore `supabase/.temp/` and `supabase/.branches/`. Use explicit `--local` for development resets and tests, and explicit `--linked` only for reviewed forward migration commands against the intended staging/production project. Never run `db reset --linked` against any remote project.
+`supabase login` is interactive and its token is never copied into chat. Linking must be repeated/verified when switching worktrees or targets. Before every mutating CLI command, print and compare the intended project reference against an allowlist. Commit `supabase/config.toml`, timestamped migrations, database tests, safe seed tooling, and generated TypeScript types. Ignore `supabase/.temp/`, `.supabase/`, and all environment files except `.env.example`.
+
+`supabase db reset` is prohibited against every cloud project, including Development and Test. The CLI dry-run and migration list are mandatory before `db push`. Applied migrations are never edited; corrections are new forward-only migrations. Staging and Production pushes occur only through separately approved deployment gates.
 
 ## Migrations and seed strategy
 
@@ -356,9 +368,11 @@ Use forward-only reviewed SQL migrations:
 2. Profile creation, role helpers, and grants.
 3. RLS policies and lifecycle functions.
 4. Storage bucket and object policies.
-5. Seed fixtures for local Auth users and the nine Nagpur properties/images metadata.
+5. Development/Test fixture tooling for Auth users and the nine Nagpur properties/images metadata; fixtures are not embedded in a production migration.
 
-The nine project-owned WebP files stay in `public/` for the Stage 2 baseline and tests. Local and staging seed setup uploads/copies equivalent fixtures into Storage through a repeatable, environment-guarded seed script. The script must refuse a production project reference, and no illustrative listing seed is ever applied to production. Every migration must replay from empty state with `npx supabase db reset --local` and generated types must match the resulting schema.
+The nine project-owned WebP files stay in `public/` for the Stage 2 baseline and tests. An idempotent, environment-guarded script creates disposable test identities and uploads/copies illustrative fixtures into Development/Test Storage using unique run IDs. It requires an explicit allowlisted project reference, refuses Staging/Production, and cleans up only records created by that run. No illustrative listing seed is ever applied to Production.
+
+Migration replay from an empty database is verified only on a disposable Test project/preview branch whose destruction is explicitly approved. Shared Development is never reset. Generated types come from the migrated Development schema and are regenerated to a temporary file for drift comparison.
 
 ## Provisional retention and privacy workflows
 
@@ -394,7 +408,7 @@ Use pgTAP under `supabase/tests/` to verify:
 - Revision publication swaps the stable pointer atomically and never exposes a draft/approved revision.
 - Retention dry-runs are non-mutating; execution is idempotent, legal-hold aware, and preserves referential history.
 
-Run with `npx supabase test db` against the local stack.
+The Supabase CLI pgTAP runner can rely on a container even when a linked database is selected, so Stage 3 does not use it. `npm run test:db:cloud` invokes a repository-owned Node runner using the `pg` package and an ignored `SUPABASE_TEST_DB_URL`. The runner verifies the allowlisted Test project, opens a TLS PostgreSQL connection, runs each `supabase/tests/*.test.sql` file in an explicit transaction, captures pgTAP output, exits nonzero on SQL or `not ok` results, and always rolls back. Tests use deterministic or run-scoped UUIDs and do not depend on pre-existing shared data. Application/Storage integration tests create run-scoped Auth users, object prefixes, and rows, then clean up only those resources. If a separate Test project or preview branch is unavailable, database security, clean-schema replay, and destructive lifecycle verification remain blocked; they are not redirected to Development.
 
 ### Application tests
 
@@ -411,16 +425,18 @@ Run:
 
 ```text
 npm ci
-npx supabase start
-npx supabase db reset
-npx supabase test db
+npx supabase link --project-ref <approved-test-project-ref>
+npx supabase migration list --linked
+npx supabase db push --linked --dry-run
+npx supabase db push --linked
+npm run test:db:cloud
 npm test
 npm run lint
 npm run typecheck
 npm run build
 ```
 
-Add secret scanning, migration linting, generated-type drift detection, and a check that service-role identifiers do not appear in client bundles/source imports. Apply migrations to a staging Supabase project before production. Back up production, verify migration history, deploy schema before application code when backward compatible, smoke-test public and role workflows, and document rollback as a forward corrective migration rather than rewriting applied migrations.
+CI uses a dedicated Test project or per-PR Supabase preview branch and serialized access when the target is shared; it never uses Development, Staging, or Production for destructive testing. Add secret scanning, migration-history checks, generated-type drift detection, and a check that privileged identifiers do not appear in client bundles/source imports. Apply migrations to Staging before Production. Back up Production, verify migration history, deploy schema before application code when backward compatible, smoke-test public and role workflows, and roll back with a forward corrective migration rather than rewriting applied migrations.
 
 ## Incremental delivery strategy
 
@@ -443,14 +459,29 @@ Each slice is independently testable and committed separately. The Stage 2 publi
 5. Approval and publication are separate AAL2-admin actions.
 6. Property images use a private bucket and short-lived signed URLs.
 7. Admin MFA is mandatory before production; inability to verify it blocks deployment.
-8. Development uses local Supabase; staging and production are separate remote projects; remote reset is prohibited.
+8. Development uses a dedicated Supabase Cloud Development project without Docker; destructive/replay verification uses an isolated Cloud Test target; Staging and Production remain separate and every cloud reset is prohibited.
 9. Retention periods use the provisional table above, safe deletion/anonymization, and legal review before production automation.
-10. Nine illustrative Nagpur listings are local/staging fixtures only and are prohibited in production.
+10. Nine illustrative Nagpur listings are Development/Test/Staging fixtures only and are prohibited in Production.
+
+## Supabase Cloud setup runbook (operator-performed)
+
+No step in this section is authorized until the user approves the exact target project and operations. The operator performs these actions without pasting secrets into chat:
+
+1. In Supabase Dashboard, create a new project named **SAT12 Development** in the chosen organization and an India-adjacent region appropriate for the team. Generate a unique database password and store it in the team's password manager.
+2. Create a separate **SAT12 Test** project, or enable an isolated preview-branch workflow, for clean migration replay and destructive test data. Never point tests at Staging or Production.
+3. From Development **Project Settings → API**, copy the Project URL and publishable key into ignored `.env.local`. Do not place a service-role key in any `NEXT_PUBLIC_*` variable.
+4. From the developer's Supabase account settings, create a least-privilege personal access token for CLI use. Store it in the OS credential manager or transient process environment, not the repository or chat. Use a separate protected CI token later.
+5. In Development **Authentication → Providers**, enable email/password and require email confirmation. Set Site URL to `http://localhost:3000` and allow `http://localhost:3000/auth/callback` for development. Production URLs and SMTP remain separate launch tasks.
+6. Confirm TOTP MFA is available for Development. Do not grant an admin role until the audited bootstrap migration/script exists; afterward, enroll the first admin and prove AAL1 denial plus AAL2 success.
+7. Do not manually create application tables, functions, RLS policies, or the Storage bucket in the Dashboard. Apply them from reviewed migrations so Git remains authoritative.
+8. Invite teammates through the Supabase organization/project access UI with the minimum role required. Share project identifiers and browser-safe values through team configuration; share operational secrets only through an approved secret manager.
+
+Developer `.env.local` contains only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. CLI/project automation values belong in transient shell variables or a separate ignored operational env file: `SUPABASE_PROJECT_REF`, `SUPABASE_TEST_PROJECT_REF`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_TEST_DB_URL`, and, only when prompted by the CLI, `SUPABASE_DB_PASSWORD`. The database URL/password are secrets and must never be printed. `SUPABASE_SERVICE_ROLE_KEY` is permitted only for the one-time bootstrap and tightly scoped fixture/cleanup scripts running in a trusted server process; the application does not read it during normal runtime.
 
 ## Implementation prerequisites and external blockers
 
-- **Available before remote provisioning:** Docker-compatible runtime, Node/npm, local Supabase CLI, the existing local images, and this repository are sufficient for Tasks 1–9 local work.
-- **Required for staging:** an explicitly provisioned staging Supabase project/reference, public URL/publishable key, protected database/service credentials in the deployment secret store, configured Auth redirect URLs/email delivery, and a staging hosting URL. These are not provisioned by this plan.
+- **Required before implementation:** user-approved Development project reference and permitted operations, Project URL/publishable key, CLI access token, database password in a local secret store, and a confirmed Auth redirect URL. A separate approved Cloud Test project/preview branch is required for clean migration replay and destructive security verification. None is provisioned by this plan.
+- **Required for staging:** a separately approved Staging Supabase project/reference, public URL/publishable key, protected database/operational credentials in the deployment secret store, configured Auth redirect URLs/email delivery, and a staging hosting URL. These are not provisioned by this plan.
 - **Required for production:** a separate explicitly provisioned production Supabase project, production hosting environment, verified email provider/domain, backup/restore ownership, monitoring, first-admin identity, secure bootstrap operator, TOTP recovery procedure, and successful staging MFA/security evidence. Remote provisioning needs explicit user approval.
 - **Legal blocker:** automatic production retention/purge stays disabled until counsel approves periods, notice language/delivery, legal holds, enquiry anonymization, and approval-history disposition. Manual deletion must also honor holds and audit logging.
 - **Operational blocker:** production launch is blocked if AAL2 cannot be enforced in both database policies/functions and browser flows, or if the initial admin cannot enroll/recover MFA safely.
@@ -464,7 +495,7 @@ Each slice is independently testable and committed separately. The Stage 2 publi
 - **Admin bootstrap/MFA:** one service-role-only bootstrap is audited and self-disabling after the first admin. It grants the role but not administrative access until TOTP produces AAL2. Production remains blocked until staging verifies enrollment, challenge, denial, and recovery.
 - **Retention:** candidate calculation, holds, notices, anonymization/deletion, retries, and audit are explicit. No automatic production schedule exists before legal review; approval-history disposition deliberately fails closed pending that decision.
 - **Stage 2 preservation:** database rows map to the existing `Property[]`; filters remain client-side initially; markers receive all ordinary-filter matches and map bounds narrow only listings.
-- **Migration/deployment:** migrations are forward-only, local resets are explicitly local, illustrative data is blocked from production, and no remote resource or migration is authorized by this document.
+- **Migration/deployment:** migrations are forward-only, every cloud reset is prohibited, mutating commands require an approved/allowlisted target plus dry-run, illustrative data is blocked from Staging/Production, and no remote resource or migration is authorized by this document.
 
 The review found no unresolved internal contradiction after adopting the stable-property/versioned-revision split. Remaining blockers are external/operational or legal and are listed above; they do not require weakening RLS or changing the Stage 2 UI.
 
@@ -477,7 +508,7 @@ The review found no unresolved internal contradiction after adopting the stable-
 5. Owners can manage only their listings and cannot bypass moderation; admins have auditable transition controls.
 6. Only published listings appear to anonymous users.
 7. Database loading, error, inventory-empty, filter-empty, and map-empty states are distinct and accessible.
-8. Migrations recreate the local environment, generated types are current, and database/application/browser/security checks pass.
+8. Migrations replay cleanly on an approved disposable Cloud Test target, generated types match the Development schema, and database/application/browser/security checks pass without Docker.
 9. Deployment uses staging verification and forward-only migration discipline.
 10. Published revisions retain one stable public URL and cannot bypass submission, approval, and publication.
 11. AAL1 administrators cannot perform privileged reads or mutations; production remains blocked until AAL2 is verified in staging.

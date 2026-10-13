@@ -6,22 +6,24 @@
 
 **Architecture:** PostgreSQL and Storage are protected by RLS and lifecycle functions; Supabase Auth supplies cookie-backed identity. A server-side repository maps published rows into the existing `Property[]` contract, while the current page coordinator moves unchanged into a Client Component. Owner/admin mutations use validated Server Actions with the caller's Supabase session, never a browser-visible service-role key.
 
-**Tech Stack:** Next.js App Router 16.4, React 19, TypeScript, Tailwind CSS 4, Supabase Auth/PostgreSQL/Storage, `@supabase/supabase-js`, `@supabase/ssr`, Supabase CLI, PostgreSQL/PostGIS, Zod, pgTAP, Vitest, Testing Library, Playwright.
+**Tech Stack:** Next.js App Router 16.4, React 19, TypeScript, Tailwind CSS 4, Supabase Cloud Development/Test projects with Auth/PostgreSQL/Storage, `@supabase/supabase-js`, `@supabase/ssr`, Supabase CLI (no Docker), PostgreSQL/PostGIS, Zod, pgTAP, Vitest, Testing Library, Playwright.
 
 **Spec:** `docs/superpowers/specs/2026-10-12-sat12-stage-3-supabase-property-management-design.md`
 
 ## Global Constraints
 
-- Apply the approved product decisions exactly as recorded in the spec; remaining external prerequisites gate staging/production, not local implementation.
+- Apply the approved product decisions exactly as recorded in the spec. Backend implementation is blocked until the user approves the exact Cloud Development/Test targets and permitted operations.
 - Preserve SAT12 red `#DC0011`, charcoal, white, light gray, the approximately 30/70 desktop map/results layout, responsive result columns, and mobile Map/List behavior.
 - Preserve the invariant: ordinary filters control map markers and listings; map bounds narrow listings only.
 - Never expose `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_DB_PASSWORD` to Client Components, `NEXT_PUBLIC_*` variables, browser responses, logs, or committed files.
 - Enable RLS on every exposed application table and Storage access path; do not add permissive temporary policies.
 - Keep applied migrations forward-only and review SQL before committing.
-- Keep the nine Nagpur mock records as deterministic local/staging fixtures only; seed tooling must refuse a production project reference.
+- Keep the nine Nagpur mock records as deterministic Development/Test/Staging fixtures only; seed tooling must refuse Production project references and require separate approval for Staging.
 - Require verified TOTP/AAL2 for every administrator read or mutation; an admin role at AAL1 has no administrative authority.
 - Preserve stable property IDs/slugs and enquiry links across copy-on-revision publication.
-- Never run `supabase db reset --linked`; development resets always use `--local`.
+- Do not install, start, or depend on Docker or local Supabase containers.
+- Never run `supabase db reset` against a cloud project. Before every `db push`, verify the allowlisted project reference, run `migration list --linked`, and review `db push --linked --dry-run`.
+- Use a separate Cloud Test project or approved preview branch for clean replay/destructive verification; tests must not reset Development, Staging, or Production.
 - Keep production retention scheduling disabled until the provisional policy completes legal review.
 - Do not implement payments, subscriptions, persistent favorites, alerts, KYC, multi-city search, or unrelated UI redesign.
 
@@ -44,7 +46,6 @@ supabase/
     <timestamp>_stage3_core_schema.sql
     <timestamp>_stage3_auth_and_rls.sql
     <timestamp>_stage3_storage.sql
-  seed.sql
   tests/
     schema.test.sql
     properties_rls.test.sql
@@ -85,7 +86,7 @@ tests/e2e/property-workflow.spec.ts
 
 ---
 
-### Task 1: Establish reproducible Supabase schema and generated types
+### Task 1: Establish the Docker-free Cloud Development foundation
 
 **Files:**
 - Modify: `.gitignore`
@@ -94,53 +95,76 @@ tests/e2e/property-workflow.spec.ts
 - Create: `.env.example`
 - Create: `supabase/config.toml`
 - Create: `supabase/migrations/<timestamp>_stage3_core_schema.sql`
-- Create: `supabase/seed.sql`
 - Create: `supabase/tests/schema.test.sql`
+- Create: `scripts/assert-supabase-target.mjs`
+- Create: `scripts/run-cloud-db-tests.mjs`
+- Create: `scripts/seed-cloud-fixtures.mjs`
 - Create: `src/types/database.generated.ts`
 
 **Interfaces:**
 - Produces: `profiles`, stable `properties`, `property_revisions`, `property_images`, `enquiries`, `listing_approvals`, `role_audit_log`, `legal_holds`, and `retention_audit_log`; database enums; `Database` generated type.
 - Consumes: the approved role, lifecycle, published-edit, and seed decisions from the spec.
 
-- [ ] **Step 1: Add failing schema tests**
+- [ ] **Step 1: Confirm the approved cloud targets without exposing secrets**
 
-Create pgTAP assertions for each table, enum, foreign key, unique/positive/range constraint, required lifecycle timestamp column, index, and RLS-enabled flag. Include checks that stable property identity is separate from versioned content, latitude accepts `21.1458` but rejects `91`, price rejects `0`, image positions reject `12`, and at most one working revision exists per property.
+Require user approval of exact Development and Test project references before any remote command. The operator creates both projects using the spec runbook and places browser-safe Development values in ignored `.env.local`; CLI access token/database password stay in the OS credential store or transient environment. Record only non-secret project aliases in local configuration.
 
-- [ ] **Step 2: Run the schema test to verify RED**
+- [ ] **Step 2: Add target guards and failing schema tests**
 
-Run: `npx supabase start && npx supabase test db supabase/tests/schema.test.sql`
+Create a script that compares the intended project reference with an explicit per-operation allowlist and refuses unknown or Production targets; test commands accept Test only, while fixture commands accept Development/Test and separately approved Staging. Add a Node `pg` runner that accepts test paths, connects only through ignored `SUPABASE_TEST_DB_URL`, executes every pgTAP file transactionally, parses TAP output, always rolls back, and exits nonzero on SQL errors or `not ok`. Create pgTAP assertions for each table, enum, foreign key, unique/positive/range constraint, required lifecycle timestamp column, index, and RLS-enabled flag. Include checks that stable property identity is separate from versioned content, latitude accepts `21.1458` but rejects `91`, price rejects `0`, image positions reject `12`, and at most one working revision exists per property.
+
+- [ ] **Step 3: Link the approved Test project and verify RED**
+
+Run only after explicit remote-operation approval:
+
+```powershell
+node scripts/assert-supabase-target.mjs test
+npx supabase link --project-ref $env:SUPABASE_TEST_PROJECT_REF
+npx supabase migration list --linked
+npm run test:db:cloud -- supabase/tests/schema.test.sql
+```
 
 Expected: FAIL because application relations do not exist.
 
-- [ ] **Step 3: Write the core migration**
+- [ ] **Step 4: Write the core migration**
 
 Create the approved enums and tables exactly as specified. Add stable `properties.published_revision_id`, versioned `property_revisions.replaces_revision_id`, revision-scoped images, enquiry snapshot revision, timestamps, update triggers, B-tree/partial indexes, and `extensions.geography(Point,4326)` plus GiST index. Resolve the circular stable-pointer FK with an ordered `alter table`. Enable RLS immediately after each table is created; do not add policies in this task.
 
-- [ ] **Step 4: Add local configuration and safe environment template**
+- [ ] **Step 5: Add CLI configuration and safe environment template**
 
-Install CLI, Supabase JS/SSR, and Zod dependencies. Add `.env.example` with blank values, explicitly unignore it with `!.env.example`, and ignore `/supabase/.temp/` and `/supabase/.branches/`.
+Install CLI, Supabase JS/SSR, Zod, and the Node PostgreSQL driver dependencies. Add `.env.example` with blank names only, explicitly unignore it with `!.env.example`, and ignore `/supabase/.temp/`, `/.supabase/`, and operational env files. No Docker scripts are added.
 
-- [ ] **Step 5: Reset and generate types**
+- [ ] **Step 6: Preview and apply the migration to the approved Test project**
 
 Run:
 
 ```powershell
-npx supabase db reset --local
-npx supabase gen types typescript --local | Set-Content src/types/database.generated.ts
-npx supabase test db supabase/tests/schema.test.sql
+node scripts/assert-supabase-target.mjs test
+npx supabase migration list --linked
+npx supabase db push --linked --dry-run
+npx supabase db push --linked
+npm run test:db:cloud -- supabase/tests/schema.test.sql
 ```
 
-Expected: reset succeeds and schema tests pass.
+Expected: the preview lists only reviewed migrations; the push and schema tests pass. Never reset the project.
 
-- [ ] **Step 6: Add deterministic local seed rows**
+- [ ] **Step 7: Apply to approved Development and generate types**
 
-Seed role-specific test users and nine stable Nagpur property/revision records using stable UUIDs. Add an environment guard that permits illustrative fixtures only for local or the allowlisted staging project and fails closed for production. Map image metadata to Storage paths, not public URLs.
+Relink only after the target guard confirms Development, repeat migration list/dry-run/push, then run:
 
-- [ ] **Step 7: Verify generated-type drift**
+```powershell
+npx supabase gen types typescript --project-id $env:SUPABASE_PROJECT_REF --schema public | Set-Content src/types/database.generated.ts
+```
 
-Regenerate to a temporary path and compare it byte-for-byte with `src/types/database.generated.ts`. Expected: no diff.
+- [ ] **Step 8: Add deterministic cloud fixture tooling**
 
-- [ ] **Step 8: Commit**
+Create run-scoped role fixtures and nine stable Nagpur property/revision records using deterministic fixture identifiers. The idempotent script accepts only allowlisted Development/Test references (or Staging after separate approval), always refuses Production, maps images to private Storage paths, never prints credentials, and can remove only resources owned by its run ID. Keep fixtures out of schema migrations.
+
+- [ ] **Step 9: Verify generated-type drift**
+
+Regenerate from the approved Development project to a temporary path and compare it byte-for-byte with `src/types/database.generated.ts`. Expected: no diff.
+
+- [ ] **Step 10: Commit**
 
 ```powershell
 git add .gitignore .env.example package.json package-lock.json supabase src/types/database.generated.ts
@@ -175,7 +199,7 @@ Assert only the approved guest/authenticated model can insert; sender reads own 
 
 - [ ] **Step 4: Run database tests to verify RED**
 
-Run: `npx supabase test db supabase/tests/properties_rls.test.sql supabase/tests/enquiries_rls.test.sql supabase/tests/listing_workflow.test.sql`
+Run: `node scripts/assert-supabase-target.mjs test && npm run test:db:cloud -- supabase/tests/properties_rls.test.sql supabase/tests/enquiries_rls.test.sql supabase/tests/listing_workflow.test.sql`
 
 Expected: FAIL because policies/functions do not exist.
 
@@ -197,7 +221,7 @@ Add a service-role-only function that accepts one confirmed Auth user, refuses i
 
 - [ ] **Step 9: Run all database tests**
 
-Run: `npx supabase db reset --local && npx supabase test db`
+Run: `node scripts/assert-supabase-target.mjs test && npx supabase migration list --linked && npx supabase db push --linked --dry-run && npx supabase db push --linked && npm run test:db:cloud`
 
 Expected: all schema, RLS, enquiry, and workflow tests pass.
 
@@ -216,7 +240,6 @@ git commit -m "feat: secure SAT12 listings with RLS workflows"
 - Create: `supabase/migrations/<timestamp>_stage3_storage.sql`
 - Create: `supabase/tests/storage_rls.test.sql`
 - Create: `scripts/seed-property-images.mjs`
-- Modify: `supabase/seed.sql`
 
 **Interfaces:**
 - Produces: private `property-images` bucket and policy-controlled paths `{ownerId}/{propertyId}/{revisionId}/{imageId}.{ext}`.
@@ -228,7 +251,7 @@ Cover owner upload to the exact revision prefix, cross-owner/cross-revision pref
 
 - [ ] **Step 2: Run the focused test to verify RED**
 
-Run: `npx supabase test db supabase/tests/storage_rls.test.sql`
+Run: `node scripts/assert-supabase-target.mjs test && npm run test:db:cloud -- supabase/tests/storage_rls.test.sql`
 
 Expected: FAIL because the bucket/policies do not exist.
 
@@ -238,16 +261,19 @@ Create the private bucket with 5 MB limit and `image/jpeg,image/png,image/webp`.
 
 - [ ] **Step 4: Add repeatable fixture upload script**
 
-Read local WebPs from `public/images/properties`, upload with the local service credential only, fail if required env values are absent, and avoid printing secrets. Use unique immutable paths and no `upsert`.
+Read WebPs from `public/images/properties`, upload only to an allowlisted Development/Test project (or separately approved Staging) using a process-only service credential, fail if required env values are absent, and avoid printing secrets. Always refuse Production. Use a unique run prefix, immutable paths, no `upsert`, and scoped cleanup.
 
 - [ ] **Step 5: Run database and seed verification**
 
 Run:
 
 ```powershell
-npx supabase db reset --local
+node scripts/assert-supabase-target.mjs test
+npx supabase migration list --linked
+npx supabase db push --linked --dry-run
+npx supabase db push --linked
 node scripts/seed-property-images.mjs
-npx supabase test db
+npm run test:db:cloud
 ```
 
 Expected: all tests pass and nine fixture objects exist at expected paths.
@@ -310,7 +336,7 @@ Use Server Actions with Zod, `useActionState`, pending buttons, field/form error
 
 - [ ] **Step 7: Prove MFA enforcement locally**
 
-Test that an admin role with AAL1 is redirected to the MFA challenge and that direct Server Action/RPC attempts fail. Test a valid TOTP challenge produces AAL2 and permits the action. If the local stack cannot prove both browser and database enforcement, record production deployment as blocked rather than weakening the rule.
+Test that an admin role with AAL1 is redirected to the MFA challenge and that direct Server Action/RPC attempts fail. Test a valid TOTP challenge produces AAL2 and permits the action in the Cloud Test project. If browser and database enforcement cannot both be proved, record production deployment as blocked rather than weakening the rule.
 
 - [ ] **Step 8: Run focused and full frontend checks**
 
@@ -438,7 +464,7 @@ Use unique revision-scoped paths, validate before upload, record metadata after 
 
 - [ ] **Step 7: Run focused, full, and database tests**
 
-Run: `npm test && npx supabase test db && npm run lint && npm run typecheck`
+Run: `npm test && node scripts/assert-supabase-target.mjs test && npm run test:db:cloud && npm run lint && npm run typecheck`
 
 Expected: all pass.
 
@@ -491,7 +517,7 @@ Assert an approved-but-unpublished revision is absent from the public repository
 
 - [ ] **Step 6: Run all checks and commit**
 
-Run: `npm test && npx supabase test db && npm run lint && npm run typecheck`
+Run: `npm test && node scripts/assert-supabase-target.mjs test && npm run test:db:cloud && npm run lint && npm run typecheck`
 
 Then:
 
@@ -535,7 +561,7 @@ Show only policy-visible enquiries, status filters, property context, and safe s
 
 - [ ] **Step 5: Run full checks and commit**
 
-Run: `npm test && npx supabase test db && npm run lint && npm run typecheck`
+Run: `npm test && node scripts/assert-supabase-target.mjs test && npm run test:db:cloud && npm run lint && npm run typecheck`
 
 Then:
 
@@ -571,7 +597,7 @@ Assert dry-run changes nothing, execution is idempotent, batches are bounded, ob
 
 - [ ] **Step 3: Run focused tests to verify RED**
 
-Run: `npx supabase test db supabase/tests/retention.test.sql`
+Run: `node scripts/assert-supabase-target.mjs test && npm run test:db:cloud -- supabase/tests/retention.test.sql`
 
 Expected: FAIL because retention functions/fields do not exist.
 
@@ -589,7 +615,7 @@ Show counts and reasons by category, legal-hold exclusions, notification readine
 
 - [ ] **Step 7: Run all checks and commit**
 
-Run: `npx supabase test db && npm test && npm run lint && npm run typecheck`
+Run: `node scripts/assert-supabase-target.mjs test && npm run test:db:cloud && npm test && npm run lint && npm run typecheck`
 
 Then:
 
@@ -600,7 +626,7 @@ git commit -m "feat: add safe SAT12 retention workflows"
 
 ---
 
-### Task 10: Add end-to-end workflow and security regression coverage
+### Task 10: Add cloud E2E/security coverage and deployment readiness
 
 **Files:**
 - Modify: `package.json`
@@ -610,10 +636,18 @@ git commit -m "feat: add safe SAT12 retention workflows"
 - Create: `tests/e2e/auth-access.spec.ts`
 - Create: `scripts/check-client-secrets.mjs`
 - Create: CI workflow file matching repository conventions
+- Modify: `README.md`
+- Create: `docs/stage3-cloud-development.md`
+- Create: `docs/stage3-deployment-runbook.md`
+- Create: `docs/stage3-retention-policy.md`
+- Create: `docs/screenshots/sat12-stage3-owner-dashboard.png`
+- Create: `docs/screenshots/sat12-stage3-admin-review.png`
+- Create: `docs/screenshots/sat12-stage3-public-desktop.png`
+- Create: `docs/screenshots/sat12-stage3-public-mobile.png`
 
 **Interfaces:**
-- Produces: repeatable browser workflow and bundle/source secret checks.
-- Consumes: complete Stage 3 local stack and role fixtures.
+- Produces: repeatable browser workflow, bundle/source secret checks, teammate cloud setup, deployment gates, and final verification evidence.
+- Consumes: the approved Cloud Test target and run-scoped role fixtures.
 
 - [ ] **Step 1: Write the owner-to-public E2E test**
 
@@ -633,57 +667,30 @@ Run: `npx playwright test`
 
 Expected after implementation: all supported desktop/mobile projects pass with no console errors.
 
-- [ ] **Step 5: Add CI pipeline**
+- [ ] **Step 5: Add a Docker-free CI pipeline**
 
-Start Supabase, reset migrations, run pgTAP, regenerate/compare database types, then run npm tests, lint, typecheck, build, secret check, and Playwright. Pin action majors and keep remote deployment credentials out of pull-request jobs.
+Use an approved dedicated Cloud Test project with serialized jobs, or an approved per-PR Supabase preview branch. Verify the target allowlist, run migration list, dry-run then apply forward migrations, run transactional pgTAP, regenerate/compare database types, create run-scoped fixtures, run npm tests/lint/typecheck/build/secret check/Playwright, and clean up the run's fixtures. Pin action majors. Keep Development/Staging/Production and their credentials out of pull-request jobs. If no isolated cloud test target is available, CI database/E2E verification is blocked rather than redirected to a shared project.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Document cloud setup and forward-only deployment**
 
-```powershell
-git add package.json package-lock.json playwright.config.ts tests scripts .github
-git commit -m "test: verify SAT12 backend workflows"
-```
+Document Dashboard creation, `.env.example`, CLI login/link, target verification, migration list/dry-run/push, fixture setup, the Node-based cloud pgTAP runner, remote type generation, and `npm run dev`. Explain public versus operational secrets and least-privilege teammate access. For Staging/Production, require separate projects, backup, migration history review, explicit approval, schema-first compatible deploy, role smoke tests, bootstrap/TOTP recovery, monitoring, and forward corrective migrations. Prohibit all cloud resets.
 
----
+- [ ] **Step 7: Document retention and launch blockers**
 
-### Task 11: Stage, document, and verify deployment readiness
+Record provisional periods, notices, legal holds, anonymization, audit evidence, and the disabled automatic schedule. List hard blockers: absent Development/Test/Staging/Production targets as applicable, unverified AAL2/recovery, missing production email delivery/backup owner, and incomplete legal review.
 
-**Files:**
-- Modify: `README.md`
-- Create: `docs/stage3-local-development.md`
-- Create: `docs/stage3-deployment-runbook.md`
-- Create: `docs/stage3-retention-policy.md`
-- Create: `docs/screenshots/sat12-stage3-owner-dashboard.png`
-- Create: `docs/screenshots/sat12-stage3-admin-review.png`
-- Create: `docs/screenshots/sat12-stage3-public-desktop.png`
-- Create: `docs/screenshots/sat12-stage3-public-mobile.png`
-- Modify only defects proven by tests/verification
+- [ ] **Step 8: Run the complete Docker-free verification gate**
 
-**Interfaces:**
-- Produces: teammate setup instructions, staging checklist, rollback procedure, and final evidence.
-- Consumes: approved environment topology and completed Tasks 1–9.
-
-- [ ] **Step 1: Document local setup without secrets**
-
-Include Docker/CLI prerequisites, `.env.example` copy, `npx supabase start`, `db reset --local`, fixture upload, type generation, tests, and `npm run dev`. Explain which keys are public and which must remain server/CI-only.
-
-- [ ] **Step 2: Document forward-only deployment**
-
-Include separate staging/production project checks, backup, `migration list`, reviewed `db push --linked`, generated-type verification, application deploy order, smoke tests for each role, first-admin bootstrap, TOTP enrollment/recovery, monitoring, and forward corrective migration rollback. Explicitly prohibit `db reset --linked` on every remote project. State that remote provisioning and migration application require explicit approval.
-
-- [ ] **Step 3: Document provisional retention and launch blockers**
-
-Record the approved provisional periods, owner-notice requirement, legal holds, anonymization behavior, audit evidence, and automatic-scheduling prohibition. List hard launch blockers: missing staging/production projects or credentials, unverified AAL2 enforcement/recovery, absent email delivery, missing backup owner, or incomplete legal review for automated retention.
-
-- [ ] **Step 4: Run the complete clean verification sequence**
-
-Run:
+After explicit approval of the Cloud Test target:
 
 ```powershell
 npm ci
-npx supabase start
-npx supabase db reset --local
-npx supabase test db
+node scripts/assert-supabase-target.mjs test
+npx supabase link --project-ref $env:SUPABASE_TEST_PROJECT_REF
+npx supabase migration list --linked
+npx supabase db push --linked --dry-run
+npx supabase db push --linked
+npm run test:db:cloud
 npm test
 npm run lint
 npm run typecheck
@@ -692,29 +699,25 @@ node scripts/check-client-secrets.mjs
 npx playwright test
 ```
 
-Expected: every command exits 0; no client secret match; existing Stage 2 tests remain green.
+All commands must exit zero, generated types must match Development, and Stage 2 tests remain green. No reset is run.
 
-- [ ] **Step 5: Perform real browser verification**
+- [ ] **Step 9: Perform real browser verification and save evidence**
 
-At 1536×1024 and 390×844 verify public 30/70 layout, three result columns where space permits, markers/clusters, filter/map behavior, loading/error/empty states, login/recovery, owner approval/draft/upload/submit, AAL1 admin denial, TOTP/AAL2 admin approval/publish, same-URL revision cutover, authenticated enquiry flow, retention dry-run, keyboard navigation, focus, reduced motion, and no horizontal overflow.
+At 1536×1024 and 390×844 verify the public 30/70 layout, three result columns where space permits, markers/clusters, filtering/map behavior, database states, login/recovery, owner approval/draft/upload/submit, AAL1 admin denial, TOTP/AAL2 moderation, same-URL revision cutover, authenticated enquiries, retention dry-run, keyboard/focus/reduced-motion behavior, and no overflow. Save the four screenshots and inspect console/network for leaked credentials, unauthorized private paths, hydration failures, or uncaught errors.
 
-- [ ] **Step 6: Save screenshots and inspect console/network**
+- [ ] **Step 10: Verify Git scope and commit**
 
-Save the four named screenshots. Confirm no service-role key, database password, private object path without authorization, hydration error, or uncaught request error appears.
-
-- [ ] **Step 7: Verify Git scope and commit**
-
-Confirm no `.env*` secrets, `.next`, `node_modules`, Supabase temp state, or unrelated UI changes are staged. Then:
+Confirm no `.env*` secrets, `.next`, `node_modules`, Supabase temporary state, fixtures containing credentials, or unrelated UI changes are staged.
 
 ```powershell
-git add README.md docs src supabase tests scripts package.json package-lock.json playwright.config.ts .github .gitignore .env.example
-git commit -m "docs: verify SAT12 stage three readiness"
+git add README.md docs supabase src tests scripts package.json package-lock.json playwright.config.ts .github .gitignore .env.example
+git commit -m "test: verify SAT12 cloud backend readiness"
 ```
 
 ## Plan self-review
 
 - **Spec coverage:** schema, Auth/RBAC, RLS, workflows, Storage, live-data migration, all database states, environment setup, migrations, testing, deployment, and incremental preservation each map to explicit tasks.
 - **Boundary consistency:** all public UI consumes `Property[]`; managed fields use `ManagedProperty`; only repository/mappers know generated database row shapes.
-- **Security consistency:** normal requests use caller-scoped clients; RLS remains authoritative; lifecycle changes use RPCs; service credentials are limited to trusted local/CI operations.
+- **Security consistency:** normal requests use caller-scoped clients; RLS remains authoritative; lifecycle changes use RPCs; operational credentials are limited to trusted developer workstations/CI and never committed or exposed to browsers.
 - **State consistency:** `properties` owns stable URL/ownership/public pointer; `property_revisions.status` owns workflow state; `listing_approvals` is immutable revision history; only the current published pointer reaches anonymous inventory.
-- **Approval consistency:** all ten product choices are resolved. Local implementation may begin after plan approval; remote provisioning, remote migration, production launch, and retention automation retain their explicit external gates.
+- **Approval consistency:** all ten product choices are resolved. Implementation begins only after plan approval plus approval of exact Development/Test targets and operations; Staging/Production provisioning, deployment, production launch, and retention automation retain separate external gates.
