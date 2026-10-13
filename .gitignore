@@ -32,6 +32,12 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# Supabase CLI state (cloud workflow; never commit linked-project metadata)
+/supabase/.temp/
+/supabase/.branches/
+/.supabase/
 
 # vercel
 .vercel

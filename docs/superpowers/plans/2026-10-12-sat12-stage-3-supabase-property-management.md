@@ -118,9 +118,7 @@ Create a script that compares `SUPABASE_PROJECT_REF`, the Project URL host, and 
 Run only after explicit remote-operation approval:
 
 ```powershell
-node scripts/assert-supabase-target.mjs read
-npx supabase link --project-ref $env:SUPABASE_PROJECT_REF
-npx supabase migration list --linked
+npm run supabase:migrations:preview
 npm run test:db:cloud -- supabase/tests/schema.test.sql
 ```
 
@@ -139,10 +137,7 @@ Install CLI, Supabase JS/SSR, Zod, and the Node PostgreSQL driver dependencies. 
 Run:
 
 ```powershell
-node scripts/assert-supabase-target.mjs migrate
-npx supabase migration list --linked
-npx supabase db push --linked --dry-run
-npx supabase db push --linked
+npm run supabase:migrations:apply
 npm run test:db:cloud -- supabase/tests/schema.test.sql
 ```
 
@@ -221,7 +216,7 @@ Add a service-role-only function that accepts one confirmed Auth user, refuses i
 
 - [ ] **Step 9: Run all database tests**
 
-Run: `node scripts/assert-supabase-target.mjs test && npx supabase migration list --linked && npx supabase db push --linked --dry-run && npx supabase db push --linked && npm run test:db:cloud`
+Run: `npm run supabase:migrations:apply && npm run test:db:cloud`
 
 Expected: all schema, RLS, enquiry, and workflow tests pass.
 
@@ -268,10 +263,7 @@ Read WebPs from `public/images/properties`, upload only to the exact approved De
 Run:
 
 ```powershell
-node scripts/assert-supabase-target.mjs test
-npx supabase migration list --linked
-npx supabase db push --linked --dry-run
-npx supabase db push --linked
+npm run supabase:migrations:apply
 node scripts/seed-property-images.mjs
 npm run test:db:cloud
 ```
@@ -685,11 +677,7 @@ After explicit approval of the Development operations:
 
 ```powershell
 npm ci
-node scripts/assert-supabase-target.mjs test
-npx supabase link --project-ref $env:SUPABASE_PROJECT_REF
-npx supabase migration list --linked
-npx supabase db push --linked --dry-run
-npx supabase db push --linked
+npm run supabase:migrations:apply
 npm run test:db:cloud
 npm test
 npm run lint
