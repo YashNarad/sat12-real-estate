@@ -9,6 +9,7 @@ select extensions.has_table('public', 'listing_approvals', 'listing approvals ex
 select extensions.has_table('public', 'role_audit_log', 'role audit log exists');
 select extensions.has_table('public', 'legal_holds', 'legal holds exist');
 select extensions.has_table('public', 'retention_audit_log', 'retention audit log exists');
+select extensions.has_schema('private', 'private helper schema exists');
 
 select extensions.has_type('public', 'app_role', 'app role enum exists');
 select extensions.has_type('public', 'listing_intent', 'listing intent enum exists');

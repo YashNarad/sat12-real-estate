@@ -1,7 +1,39 @@
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { validateTargetFromEnvironment } from "./supabase-target.mjs";
+
+const require = createRequire(import.meta.url);
+const SUPABASE_BINARY_PACKAGES = {
+  darwin: { arm64: ["darwin-arm64"], x64: ["darwin-x64"] },
+  linux: {
+    arm64: ["linux-arm64", "linux-arm64-musl"],
+    x64: ["linux-x64", "linux-x64-musl"],
+  },
+  win32: { arm64: ["windows-arm64"], x64: ["windows-x64"] },
+};
+
+export function resolveSupabaseExecutable(
+  platform = process.platform,
+  architecture = process.arch,
+) {
+  const override = process.env.SUPABASE_CLI_BINARY_OVERRIDE;
+  if (override) return override;
+
+  const candidates = SUPABASE_BINARY_PACKAGES[platform]?.[architecture] ?? [];
+  const extension = platform === "win32" ? ".exe" : "";
+  for (const candidate of candidates) {
+    try {
+      const packageDirectory = path.dirname(
+        require.resolve(`@supabase/cli-${candidate}/package.json`),
+      );
+      return path.join(packageDirectory, "bin", `supabase${extension}`);
+    } catch {}
+  }
+  throw new Error(`No Supabase CLI binary is installed for ${platform}-${architecture}.`);
+}
 
 export function buildMigrationCommands(projectRef, apply) {
   const commands = [
@@ -13,11 +45,21 @@ export function buildMigrationCommands(projectRef, apply) {
   return commands;
 }
 
+export function buildSupabaseInvocation(
+  command,
+  executable = resolveSupabaseExecutable(),
+) {
+  return {
+    executable,
+    args: command.slice(1),
+  };
+}
+
 export function runMigrationWorkflow(apply, env = process.env) {
   const { projectRef } = validateTargetFromEnvironment(apply ? "migrate" : "read", env);
-  const executable = process.platform === "win32" ? "npx.cmd" : "npx";
   for (const command of buildMigrationCommands(projectRef, apply)) {
-    const result = spawnSync(executable, command, {
+    const invocation = buildSupabaseInvocation(command);
+    const result = spawnSync(invocation.executable, invocation.args, {
       env,
       stdio: "inherit",
       shell: false,

@@ -1,3 +1,4 @@
+import { X509Certificate } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -6,6 +7,28 @@ import {
   validateDatabaseUrl,
   validateTargetFromEnvironment,
 } from "./supabase-target.mjs";
+
+const SUPABASE_ROOT_CA_PATH = path.resolve(
+  "certificates/supabase-root-2021-ca.crt",
+);
+const SUPABASE_ROOT_CA_SHA256 =
+  "807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa";
+
+export function buildVerifiedTlsConfig(certificatePem, now = Date.now()) {
+  try {
+    const certificate = new X509Certificate(certificatePem);
+    const fingerprint = certificate.fingerprint256.replaceAll(":", "").toLowerCase();
+    const isCurrentlyValid =
+      Date.parse(certificate.validFrom) <= now && now <= Date.parse(certificate.validTo);
+    if (!certificate.ca || fingerprint !== SUPABASE_ROOT_CA_SHA256 || !isCurrentlyValid) {
+      throw new Error();
+    }
+  } catch {
+    throw new Error("Database TLS requires the verified Supabase Root 2021 CA.");
+  }
+
+  return { ca: certificatePem, rejectUnauthorized: true };
+}
 
 function visit(value, failures) {
   if (typeof value === "string") {
@@ -74,7 +97,14 @@ export async function runCloudDatabaseTests(arguments_, env = process.env) {
   ]);
   if (files.length === 0) throw new Error("No database test files were found.");
 
-  const client = new Client({ connectionString: env.SUPABASE_DB_URL, ssl: true });
+  const certificatePem = await readFile(
+    env.SUPABASE_SSL_ROOT_CERT || SUPABASE_ROOT_CA_PATH,
+    "utf8",
+  );
+  const client = new Client({
+    connectionString: env.SUPABASE_DB_URL,
+    ssl: buildVerifiedTlsConfig(certificatePem),
+  });
   await client.connect();
   try {
     for (const file of files) {

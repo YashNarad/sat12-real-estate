@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMigrationCommands } from "./run-supabase-migrations.mjs";
+import {
+  buildMigrationCommands,
+  buildSupabaseInvocation,
+} from "./run-supabase-migrations.mjs";
 
 describe("buildMigrationCommands", () => {
   it("always links and previews before an approved apply", () => {
@@ -14,5 +17,18 @@ describe("buildMigrationCommands", () => {
 
   it("omits the mutating push in preview mode", () => {
     expect(buildMigrationCommands("abcdefghijklmnopqrst", false)).toHaveLength(3);
+  });
+
+  it("launches the installed native CLI instead of a Windows cmd shim", () => {
+    const invocation = buildSupabaseInvocation(
+      ["supabase", "migration", "list", "--linked"],
+      "C:\\workspace\\node_modules\\@supabase\\cli-windows-x64\\bin\\supabase.exe",
+    );
+
+    expect(invocation).toEqual({
+      executable:
+        "C:\\workspace\\node_modules\\@supabase\\cli-windows-x64\\bin\\supabase.exe",
+      args: ["migration", "list", "--linked"],
+    });
   });
 });
