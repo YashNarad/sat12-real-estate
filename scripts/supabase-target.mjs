@@ -6,6 +6,8 @@ const APPROVAL_REQUIRED_OPERATIONS = new Set([
   "migrate",
   "seed",
   "bootstrap",
+  "fixture-apply",
+  "fixture-cleanup",
 ]);
 const ALLOWED_OPERATIONS = new Set(["read", ...APPROVAL_REQUIRED_OPERATIONS]);
 

@@ -57,6 +57,22 @@ describe("validateSupabaseTarget", () => {
     ).toThrow(/seed/);
   });
 
+  it.each(["fixture-apply", "fixture-cleanup"])(
+    "requires operation-specific approval for %s",
+    (operation) => {
+      expect(() => validateSupabaseTarget({ ...validInput, operation })).toThrow(
+        new RegExp(operation),
+      );
+      expect(
+        validateSupabaseTarget({
+          ...validInput,
+          operation,
+          operationApproval: `${operation}:${projectRef}`,
+        }),
+      ).toEqual({ operation, projectRef });
+    },
+  );
+
   it("requires explicit approval before running cloud database tests", () => {
     expect(() =>
       validateSupabaseTarget({ ...validInput, operation: "test" }),
