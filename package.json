@@ -15,6 +15,7 @@
     "supabase:migrations:apply": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/run-supabase-migrations.mjs apply",
     "supabase:fixtures": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/seed-cloud-fixtures.mjs",
     "supabase:types:check": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/check-database-types.mjs",
+    "supabase:bootstrap-admin": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/bootstrap-admin.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
