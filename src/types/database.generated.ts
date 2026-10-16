@@ -555,7 +555,332 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      approve_listing: {
+        Args: { p_notes?: string; p_revision_id: string }
+        Returns: {
+          approved_at: string | null
+          area_sq_ft: number
+          badge: string | null
+          bathrooms: number
+          bedrooms: number
+          city: string
+          construction_status: Database["public"]["Enums"]["construction_status"]
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          latitude: number
+          listing_intent: Database["public"]["Enums"]["listing_intent"]
+          locality: string
+          location: unknown
+          longitude: number
+          postal_code: string | null
+          price_inr: number
+          property_id: string
+          property_type: Database["public"]["Enums"]["property_type"]
+          published_at: string | null
+          rejection_reason: string | null
+          replaces_revision_id: string | null
+          rera_approved: boolean
+          rera_number: string | null
+          retention_not_before: string | null
+          retention_notice_sent_at: string | null
+          revision_number: number
+          state: string
+          status: Database["public"]["Enums"]["revision_status"]
+          submitted_at: string | null
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "property_revisions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      archive_listing: {
+        Args: { p_property_id: string }
+        Returns: {
+          archived_at: string | null
+          created_at: string
+          id: string
+          owner_id: string
+          published_revision_id: string | null
+          retention_not_before: string | null
+          retention_notice_sent_at: string | null
+          slug: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "properties"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      bootstrap_first_admin: {
+        Args: { p_reason: string; p_target_id: string }
+        Returns: {
+          agency_name: string | null
+          avatar_path: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_draft_listing: {
+        Args: { p_listing: Json }
+        Returns: {
+          approved_at: string | null
+          area_sq_ft: number
+          badge: string | null
+          bathrooms: number
+          bedrooms: number
+          city: string
+          construction_status: Database["public"]["Enums"]["construction_status"]
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          latitude: number
+          listing_intent: Database["public"]["Enums"]["listing_intent"]
+          locality: string
+          location: unknown
+          longitude: number
+          postal_code: string | null
+          price_inr: number
+          property_id: string
+          property_type: Database["public"]["Enums"]["property_type"]
+          published_at: string | null
+          rejection_reason: string | null
+          replaces_revision_id: string | null
+          rera_approved: boolean
+          rera_number: string | null
+          retention_not_before: string | null
+          retention_notice_sent_at: string | null
+          revision_number: number
+          state: string
+          status: Database["public"]["Enums"]["revision_status"]
+          submitted_at: string | null
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "property_revisions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_listing_revision: {
+        Args: { p_property_id: string }
+        Returns: {
+          approved_at: string | null
+          area_sq_ft: number
+          badge: string | null
+          bathrooms: number
+          bedrooms: number
+          city: string
+          construction_status: Database["public"]["Enums"]["construction_status"]
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          latitude: number
+          listing_intent: Database["public"]["Enums"]["listing_intent"]
+          locality: string
+          location: unknown
+          longitude: number
+          postal_code: string | null
+          price_inr: number
+          property_id: string
+          property_type: Database["public"]["Enums"]["property_type"]
+          published_at: string | null
+          rejection_reason: string | null
+          replaces_revision_id: string | null
+          rera_approved: boolean
+          rera_number: string | null
+          retention_not_before: string | null
+          retention_notice_sent_at: string | null
+          revision_number: number
+          state: string
+          status: Database["public"]["Enums"]["revision_status"]
+          submitted_at: string | null
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "property_revisions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      publish_listing: {
+        Args: { p_revision_id: string }
+        Returns: {
+          approved_at: string | null
+          area_sq_ft: number
+          badge: string | null
+          bathrooms: number
+          bedrooms: number
+          city: string
+          construction_status: Database["public"]["Enums"]["construction_status"]
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          latitude: number
+          listing_intent: Database["public"]["Enums"]["listing_intent"]
+          locality: string
+          location: unknown
+          longitude: number
+          postal_code: string | null
+          price_inr: number
+          property_id: string
+          property_type: Database["public"]["Enums"]["property_type"]
+          published_at: string | null
+          rejection_reason: string | null
+          replaces_revision_id: string | null
+          rera_approved: boolean
+          rera_number: string | null
+          retention_not_before: string | null
+          retention_notice_sent_at: string | null
+          revision_number: number
+          state: string
+          status: Database["public"]["Enums"]["revision_status"]
+          submitted_at: string | null
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "property_revisions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reject_listing: {
+        Args: { p_notes: string; p_revision_id: string }
+        Returns: {
+          approved_at: string | null
+          area_sq_ft: number
+          badge: string | null
+          bathrooms: number
+          bedrooms: number
+          city: string
+          construction_status: Database["public"]["Enums"]["construction_status"]
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          latitude: number
+          listing_intent: Database["public"]["Enums"]["listing_intent"]
+          locality: string
+          location: unknown
+          longitude: number
+          postal_code: string | null
+          price_inr: number
+          property_id: string
+          property_type: Database["public"]["Enums"]["property_type"]
+          published_at: string | null
+          rejection_reason: string | null
+          replaces_revision_id: string | null
+          rera_approved: boolean
+          rera_number: string | null
+          retention_not_before: string | null
+          retention_notice_sent_at: string | null
+          revision_number: number
+          state: string
+          status: Database["public"]["Enums"]["revision_status"]
+          submitted_at: string | null
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "property_revisions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_user_role: {
+        Args: {
+          p_reason: string
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_target_id: string
+        }
+        Returns: {
+          agency_name: string | null
+          avatar_path: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      submit_listing: {
+        Args: { p_revision_id: string }
+        Returns: {
+          approved_at: string | null
+          area_sq_ft: number
+          badge: string | null
+          bathrooms: number
+          bedrooms: number
+          city: string
+          construction_status: Database["public"]["Enums"]["construction_status"]
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          latitude: number
+          listing_intent: Database["public"]["Enums"]["listing_intent"]
+          locality: string
+          location: unknown
+          longitude: number
+          postal_code: string | null
+          price_inr: number
+          property_id: string
+          property_type: Database["public"]["Enums"]["property_type"]
+          published_at: string | null
+          rejection_reason: string | null
+          replaces_revision_id: string | null
+          rera_approved: boolean
+          rera_number: string | null
+          retention_not_before: string | null
+          retention_notice_sent_at: string | null
+          revision_number: number
+          state: string
+          status: Database["public"]["Enums"]["revision_status"]
+          submitted_at: string | null
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "property_revisions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       app_role: "user" | "owner_agent" | "admin"

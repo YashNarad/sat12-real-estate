@@ -12,6 +12,9 @@ describe("Task 2 cloud database test coverage", () => {
     const source = await sql("properties_rls.test.sql");
 
     expect(source).toMatch(/anonymous cannot read a draft/i);
+    expect(source).toMatch(/anonymous reads only active published property/i);
+    expect(source).toMatch(/anonymous reads only current published revision/i);
+    expect(source).toMatch(/owner reads own draft without recursion/i);
     expect(source).toMatch(/user cannot create a listing/i);
     expect(source).toMatch(/owner b cannot read owner a draft/i);
     expect(source).toMatch(/aal1 admin cannot change roles/i);

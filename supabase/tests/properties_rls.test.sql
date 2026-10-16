@@ -1,4 +1,4 @@
-select extensions.plan(13);
+select extensions.plan(16);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
@@ -38,8 +38,22 @@ values ('22000000-0000-4000-8000-000000000001', '21000000-0000-4000-8000-0000000
 insert into public.property_revisions (id, property_id, revision_number, title, description, listing_intent, property_type, price_inr, locality, latitude, longitude, bedrooms, bathrooms, area_sq_ft, construction_status, created_by)
 values ('23000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000001', 1, 'Owner A Draft', 'Private draft listing', 'buy', 'apartment', 5000000, 'Dharampeth', 21.14, 79.05, 2, 2, 1000, 'ready_to_move', '21000000-0000-4000-8000-000000000002');
 
+insert into public.properties (id, owner_id, slug)
+values ('22000000-0000-4000-8000-000000000002', '21000000-0000-4000-8000-000000000002', 'rls-owner-a-published');
+insert into public.property_revisions (id, property_id, revision_number, title, description, listing_intent, property_type, price_inr, locality, latitude, longitude, bedrooms, bathrooms, area_sq_ft, construction_status, status, published_at, created_by)
+values ('23000000-0000-4000-8000-000000000002', '22000000-0000-4000-8000-000000000002', 1, 'Owner A Published', 'Public listing', 'buy', 'apartment', 7000000, 'Civil Lines', 21.15, 79.08, 3, 2, 1400, 'ready_to_move', 'published', now(), '21000000-0000-4000-8000-000000000002');
+update public.properties
+set published_revision_id = '23000000-0000-4000-8000-000000000002'
+where id = '22000000-0000-4000-8000-000000000002';
+
 set local role anon;
-select extensions.is((select count(*) from public.property_revisions), 0::bigint, 'anonymous cannot read a draft');
+select extensions.is(
+  (select count(*) from public.property_revisions where id = '23000000-0000-4000-8000-000000000001'),
+  0::bigint,
+  'anonymous cannot read a draft'
+);
+select extensions.is((select count(*) from public.properties), 1::bigint, 'anonymous reads only active published property');
+select extensions.is((select count(*) from public.property_revisions), 1::bigint, 'anonymous reads only current published revision');
 reset role;
 
 set local role authenticated;
@@ -56,11 +70,20 @@ reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"21000000-0000-4000-8000-000000000003","aal":"aal1","role":"authenticated"}', true);
-select extensions.is((select count(*) from public.property_revisions), 0::bigint, 'owner b cannot read owner a draft');
+select extensions.is(
+  (select count(*) from public.property_revisions where id = '23000000-0000-4000-8000-000000000001'),
+  0::bigint,
+  'owner b cannot read owner a draft'
+);
 reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"21000000-0000-4000-8000-000000000002","aal":"aal1","role":"authenticated"}', true);
+select extensions.is(
+  (select count(*) from public.property_revisions where id = '23000000-0000-4000-8000-000000000001'),
+  1::bigint,
+  'owner reads own draft without recursion'
+);
 select extensions.throws_ok(
   $$update public.property_revisions set status = 'published' where id = '23000000-0000-4000-8000-000000000001'$$,
   '42501', null, 'owner cannot change revision status'
