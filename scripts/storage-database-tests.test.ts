@@ -15,14 +15,7 @@ it("covers the approved private Storage threat model", async () => {
     "cross-revision upload is denied",
     "path traversal is denied",
     "unsupported bucket is denied",
-    "object update is denied",
-    "object upsert is denied",
-    "object deletion before metadata is denied",
     "owner deletes editable image metadata",
-    "owner deletes editable image",
-    "submitted image deletion is denied",
-    "published image deletion is denied",
-    "legally held image deletion is denied",
     "legally held metadata deletion is denied",
     "anonymous reads only current published image",
     "owner reads own revision image",
@@ -33,22 +26,20 @@ it("covers the approved private Storage threat model", async () => {
   }
 });
 
-it("executes denied Storage mutations as top-level pgTAP queries", async () => {
+it("keeps unsupported Storage object mutations out of transactional pgTAP", async () => {
   const source = await readFile(
     path.resolve("supabase/tests/storage_rls.test.sql"),
     "utf8",
   );
 
   expect(source).not.toMatch(/\(\s*with\s+(?:updated|deleted)\s+as\s*\(/iu);
-
-  const topLevelMutationAssertions = source.match(
-    /select\s+extensions\.results_eq\(\s*\$mutation\$\s*with\s+(?:updated|deleted)\s+as\s*\([\s\S]*?\$mutation\$/giu,
-  );
-  expect(topLevelMutationAssertions).toHaveLength(6);
-  expect(source.match(/\$expected\$values \(0::bigint\)\$expected\$/gu)).toHaveLength(6);
+  expect(source).not.toMatch(/\bupdate\s+storage\.objects\b/iu);
+  expect(source).not.toMatch(/\bdelete\s+from\s+storage\.objects\b/iu);
+  expect(source).not.toMatch(/on\s+conflict[\s\S]*do\s+update/iu);
 
   const assertions = source.match(
     /select\s+extensions\.(?:is|ok|lives_ok|throws_ok|results_eq)\s*\(/giu,
   );
-  expect(assertions).toHaveLength(19);
+  expect(source).toMatch(/extensions\.plan\(12\)/u);
+  expect(assertions).toHaveLength(12);
 });

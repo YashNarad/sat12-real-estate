@@ -242,7 +242,7 @@ git commit -m "feat: secure SAT12 listings with RLS workflows"
 
 - [ ] **Step 1: Write failing Storage policy tests**
 
-Cover owner upload to the exact revision prefix, cross-owner/cross-revision prefix denial, unsupported bucket/path denial, update/upsert denial, editable-state delete, submitted/published/superseded delete denial, anonymous SELECT only for the stable property's current published revision, owner read of own revisions, AAL1 admin denial, and AAL2-admin access.
+Split coverage by supported execution surface. Transactional pgTAP covers database helpers, metadata RLS, path/ownership decisions, revision visibility, legal holds, and AAL rules. A separately guarded, run-scoped Storage API suite uses authenticated user clients for update/delete behavior, ownership isolation, metadata-first deletion, submitted/published protection, and legal holds. Operator credentials are limited to fixture setup, observation, scoped cleanup, and zero-residue verification. See `docs/superpowers/testing/2026-10-18-stage3-storage-security-testing.md`.
 
 - [ ] **Step 2: Run the focused test to verify RED**
 
@@ -265,10 +265,11 @@ Run:
 ```powershell
 npm run supabase:migrations:apply
 node scripts/seed-property-images.mjs
-npm run test:db:cloud
+npm run test:db:cloud -- supabase/tests/storage_rls.test.sql
+npm run test:storage:cloud
 ```
 
-Expected: all tests pass and nine fixture objects exist at expected paths.
+Expected: transactional database assertions and authenticated Storage API scenarios pass; API fixtures are removed and post-cleanup verification reports zero residual users, properties, revisions, metadata rows, or objects. The nine illustrative fixture objects exist only when their separately approved fixture command is intentionally run.
 
 - [ ] **Step 6: Commit**
 

@@ -10,6 +10,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:db:cloud": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/run-cloud-db-tests.mjs",
+    "test:storage:cloud": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/storage-api-tests.mjs",
     "supabase:target": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/assert-supabase-target.mjs",
     "supabase:migrations:preview": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/run-supabase-migrations.mjs preview",
     "supabase:migrations:apply": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/run-supabase-migrations.mjs apply",

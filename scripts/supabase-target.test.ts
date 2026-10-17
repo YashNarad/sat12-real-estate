@@ -86,6 +86,20 @@ describe("validateSupabaseTarget", () => {
       }),
     ).toEqual({ operation: "test", projectRef });
   });
+
+  it("requires separate approval for non-transactional Storage API tests", () => {
+    expect(() =>
+      validateSupabaseTarget({ ...validInput, operation: "storage-api-test" }),
+    ).toThrow(/storage-api-test/);
+
+    expect(
+      validateSupabaseTarget({
+        ...validInput,
+        operation: "storage-api-test",
+        operationApproval: `storage-api-test:${projectRef}`,
+      }),
+    ).toEqual({ operation: "storage-api-test", projectRef });
+  });
 });
 
 describe("validateDatabaseUrl", () => {
