@@ -32,3 +32,23 @@ it("covers the approved private Storage threat model", async () => {
     expect(source).toMatch(new RegExp(description, "i"));
   }
 });
+
+it("executes denied Storage mutations as top-level pgTAP queries", async () => {
+  const source = await readFile(
+    path.resolve("supabase/tests/storage_rls.test.sql"),
+    "utf8",
+  );
+
+  expect(source).not.toMatch(/\(\s*with\s+(?:updated|deleted)\s+as\s*\(/iu);
+
+  const topLevelMutationAssertions = source.match(
+    /select\s+extensions\.results_eq\(\s*\$mutation\$\s*with\s+(?:updated|deleted)\s+as\s*\([\s\S]*?\$mutation\$/giu,
+  );
+  expect(topLevelMutationAssertions).toHaveLength(6);
+  expect(source.match(/\$expected\$values \(0::bigint\)\$expected\$/gu)).toHaveLength(6);
+
+  const assertions = source.match(
+    /select\s+extensions\.(?:is|ok|lives_ok|throws_ok|results_eq)\s*\(/giu,
+  );
+  expect(assertions).toHaveLength(19);
+});

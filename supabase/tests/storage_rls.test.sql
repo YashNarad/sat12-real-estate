@@ -65,22 +65,22 @@ select extensions.throws_ok(
   $$insert into storage.objects (id, bucket_id, name, owner_id, metadata) values ('44000000-0000-4000-8000-000000000014', 'other-images', '41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000001/44000000-0000-4000-8000-000000000014.webp', '41000000-0000-4000-8000-000000000001', '{}')$$,
   '42501', null, 'unsupported bucket is denied'
 );
-select extensions.is(
-  (with updated as (
+select extensions.results_eq(
+  $mutation$with updated as (
     update storage.objects set metadata = metadata where id = '44000000-0000-4000-8000-000000000001' returning 1
-  ) select count(*) from updated),
-  0::bigint,
+  ) select count(*) from updated$mutation$,
+  $expected$values (0::bigint)$expected$,
   'object update is denied'
 );
 select extensions.throws_ok(
   $$insert into storage.objects (id, bucket_id, name, owner_id, metadata) values ('44000000-0000-4000-8000-000000000099', 'property-images', '41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000001/44000000-0000-4000-8000-000000000001.webp', '41000000-0000-4000-8000-000000000001', '{"mimetype":"image/webp","size":400000}') on conflict (bucket_id, name) do update set metadata = excluded.metadata$$,
   '42501', null, 'object upsert is denied'
 );
-select extensions.is(
-  (with deleted as (
+select extensions.results_eq(
+  $mutation$with deleted as (
     delete from storage.objects where id = '44000000-0000-4000-8000-000000000001' returning 1
-  ) select count(*) from deleted),
-  0::bigint,
+  ) select count(*) from deleted$mutation$,
+  $expected$values (0::bigint)$expected$,
   'object deletion before metadata is denied'
 );
 select extensions.lives_ok(
@@ -91,32 +91,32 @@ select extensions.lives_ok(
   $$delete from storage.objects where id = '44000000-0000-4000-8000-000000000001'$$,
   'owner deletes editable image'
 );
-select extensions.is(
-  (with deleted as (
+select extensions.results_eq(
+  $mutation$with deleted as (
     delete from storage.objects where id = '44000000-0000-4000-8000-000000000002' returning 1
-  ) select count(*) from deleted),
-  0::bigint,
+  ) select count(*) from deleted$mutation$,
+  $expected$values (0::bigint)$expected$,
   'submitted image deletion is denied'
 );
-select extensions.is(
-  (with deleted as (
+select extensions.results_eq(
+  $mutation$with deleted as (
     delete from storage.objects where id = '44000000-0000-4000-8000-000000000003' returning 1
-  ) select count(*) from deleted),
-  0::bigint,
+  ) select count(*) from deleted$mutation$,
+  $expected$values (0::bigint)$expected$,
   'published image deletion is denied'
 );
-select extensions.is(
-  (with deleted as (
+select extensions.results_eq(
+  $mutation$with deleted as (
     delete from storage.objects where id = '44000000-0000-4000-8000-000000000004' returning 1
-  ) select count(*) from deleted),
-  0::bigint,
+  ) select count(*) from deleted$mutation$,
+  $expected$values (0::bigint)$expected$,
   'legally held image deletion is denied'
 );
-select extensions.is(
-  (with deleted as (
+select extensions.results_eq(
+  $mutation$with deleted as (
     delete from public.property_images where id = '44000000-0000-4000-8000-000000000004' returning 1
-  ) select count(*) from deleted),
-  0::bigint,
+  ) select count(*) from deleted$mutation$,
+  $expected$values (0::bigint)$expected$,
   'legally held metadata deletion is denied'
 );
 reset role;
