@@ -33,7 +33,13 @@ describe("fixture planning", () => {
     expect(new Set(first.properties.map(({ id }) => id)).size).toBe(9);
     expect(first.properties.every(({ slug }) => slug.startsWith("fixture-stage3-task1-"))).toBe(true);
     expect(first.properties.every(({ ownerId }) => ownerId === OWNER_ID)).toBe(true);
-    expect(first.images.every(({ storagePath }) => storagePath.startsWith("fixtures/stage3-task1/"))).toBe(true);
+    expect(
+      first.images.every(({ storagePath }, index) =>
+        storagePath.startsWith(
+          `${OWNER_ID}/${first.properties[index].id}/${first.revisions[index].id}/`,
+        ),
+      ),
+    ).toBe(true);
   });
 
   it("isolates identifiers between fixture runs", async () => {

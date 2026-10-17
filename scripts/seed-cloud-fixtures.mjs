@@ -85,7 +85,7 @@ export function buildFixturePlan(runId, ownerId, definitions) {
       id,
       revisionId: revisions[index].id,
       ownerId,
-      storagePath: `fixtures/${runId}/${ownerId}/${properties[index].id}/${id}.webp`,
+      storagePath: `${ownerId}/${properties[index].id}/${revisions[index].id}/${id}.webp`,
       altText: definition.imageAlt,
       sourceFile: path.resolve("public/images/properties", definition.image),
     };

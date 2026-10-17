@@ -8,6 +8,8 @@ const APPROVAL_REQUIRED_OPERATIONS = new Set([
   "bootstrap",
   "fixture-apply",
   "fixture-cleanup",
+  "storage-fixture-apply",
+  "storage-fixture-cleanup",
 ]);
 const ALLOWED_OPERATIONS = new Set(["read", ...APPROVAL_REQUIRED_OPERATIONS]);
 
