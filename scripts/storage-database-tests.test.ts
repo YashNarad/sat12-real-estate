@@ -43,3 +43,28 @@ it("keeps unsupported Storage object mutations out of transactional pgTAP", asyn
   expect(source).toMatch(/extensions\.plan\(12\)/u);
   expect(assertions).toHaveLength(12);
 });
+
+it("clears authenticated JWT claims before exercising anonymous image access", async () => {
+  const source = await readFile(
+    path.resolve("supabase/tests/storage_rls.test.sql"),
+    "utf8",
+  );
+
+  expect(source).toMatch(
+    /reset role;\s*select set_config\(\s*'request\.jwt\.claims',\s*'\{"role":"anon"\}',\s*true\s*\);\s*set local role anon;\s*select extensions\.results_eq\([\s\S]*?'anonymous reads only current published image'/iu,
+  );
+});
+
+it("tests the exact anonymous image across every non-public lifecycle state", async () => {
+  const source = await readFile(
+    path.resolve("supabase/tests/storage_rls.test.sql"),
+    "utf8",
+  );
+
+  expect(source).toMatch(/'Owner A Rejected'[\s\S]*?'rejected'/iu);
+  expect(source).toMatch(/'Owner A Superseded'[\s\S]*?'superseded'/iu);
+  expect(source).toMatch(/storage-owner-a-archived[\s\S]*?archived_at/iu);
+  expect(source).toMatch(
+    /select extensions\.results_eq\([\s\S]*?select id from storage\.objects[\s\S]*?values \('44000000-0000-4000-8000-000000000003'::uuid\)[\s\S]*?'anonymous reads only current published image'/iu,
+  );
+});
