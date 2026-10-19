@@ -43,6 +43,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@supabase/ssr", () => ({ createServerClient: createSupabaseServerClient }));
 
 import { updateSession } from "./proxy";
+import { config as proxyConfig } from "@/proxy";
 
 describe("Supabase session refresh proxy", () => {
   beforeEach(() => {
@@ -52,7 +53,7 @@ describe("Supabase session refresh proxy", () => {
   });
 
   it("preserves refreshed and deleted cookie options on the response", async () => {
-    const request = new NextRequest("https://sat12.example/account");
+    const request = new NextRequest("https://sat12.example/");
     const response = await updateSession(request);
 
     expect(getClaims).toHaveBeenCalledOnce();
@@ -64,5 +65,9 @@ describe("Supabase session refresh proxy", () => {
     expect(setCookie).toContain("Secure");
     expect(setCookie).toContain("sb-stale-token=");
     expect(setCookie).toContain("Max-Age=0");
+  });
+
+  it("refreshes sessions on the homepage where account identity is rendered", () => {
+    expect(proxyConfig.matcher).toContain("/");
   });
 });

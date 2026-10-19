@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
-import Home from "./page";
+import { HomeClient } from "@/components/home/HomeClient";
 
 const mapHarness = vi.hoisted(() => ({
   props: null as null | Record<string, unknown>,
@@ -22,8 +22,12 @@ beforeEach(() => {
   mapHarness.isDesktop = true;
 });
 
+function renderHome() {
+  return render(<HomeClient accountControl={<span>Account</span>} />);
+}
+
 it("exposes the SAT12 property results landmark", () => {
-  render(<Home />);
+  renderHome();
   expect(
     screen.getByRole("main", { name: /nagpur property results/i }),
   ).toBeInTheDocument();
@@ -31,7 +35,7 @@ it("exposes the SAT12 property results landmark", () => {
 
 it("changes the real listing intent from the header navigation", async () => {
   const user = userEvent.setup();
-  render(<Home />);
+  renderHome();
 
   await user.click(screen.getByRole("button", { name: "Rent" }));
 
@@ -41,7 +45,7 @@ it("changes the real listing intent from the header navigation", async () => {
 
 it("keeps all ordinary-filter markers while map bounds narrow listings", async () => {
   const user = userEvent.setup();
-  render(<Home />);
+  renderHome();
   const initialMarkerIds = screen.getByTestId("property-map").getAttribute("data-property-ids");
   expect(initialMarkerIds?.split(",")).toHaveLength(7);
   await user.click(screen.getByRole("checkbox", { name: "Search as I move the map" }));
@@ -52,7 +56,7 @@ it("keeps all ordinary-filter markers while map bounds narrow listings", async (
 
 it("synchronizes card and marker selection", async () => {
   const user = userEvent.setup();
-  render(<Home />);
+  renderHome();
   await user.click(screen.getByRole("button", { name: "Select first marker" }));
   expect(screen.getAllByTestId("property-card")[0].querySelector("button[aria-pressed='true']")).not.toBeNull();
   const secondCard = screen.getAllByTestId("property-card")[1];
@@ -63,7 +67,7 @@ it("synchronizes card and marker selection", async () => {
 it("defers the map in mobile list view and mounts it after switching", async () => {
   mapHarness.isDesktop = false;
   const user = userEvent.setup();
-  render(<Home />);
+  renderHome();
   expect(screen.queryByTestId("property-map")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Map" }));
   expect(screen.getByTestId("property-map")).toBeInTheDocument();
