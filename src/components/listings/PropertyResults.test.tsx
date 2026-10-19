@@ -5,8 +5,8 @@ import type { Property } from "@/types/property";
 import { PropertyResults } from "./PropertyResults";
 
 const properties: Property[] = [
-  { id: "high", title: "4 BHK Villa", listingIntent: "Buy", propertyType: "Villa", price: 18_000_000, locality: "Manish Nagar", city: "Nagpur", latitude: 21.09, longitude: 79.07, image: { src: "/images/properties/property-02.svg", alt: "Villa", license: "SAT12 placeholder" }, bedrooms: 4, bathrooms: 4, areaSqFt: 2800, status: "Under Construction", reraApproved: true },
-  { id: "low", title: "3 BHK Apartment", listingIntent: "Buy", propertyType: "Apartment", price: 8_500_000, locality: "Dharampeth", city: "Nagpur", latitude: 21.14, longitude: 79.05, image: { src: "/images/properties/property-01.svg", alt: "Apartment", license: "SAT12 placeholder" }, bedrooms: 3, bathrooms: 2, areaSqFt: 1450, status: "Ready to Move", reraApproved: true },
+  { id: "high", title: "4 BHK Villa", listingIntent: "Buy", propertyType: "Villa", price: 18_000_000, locality: "Manish Nagar", city: "Nagpur", latitude: 21.09, longitude: 79.07, image: { src: "/images/properties/property-02.svg", alt: "Villa", kind: "illustrative" }, bedrooms: 4, bathrooms: 4, areaSqFt: 2800, status: "Under Construction", reraApproved: true },
+  { id: "low", title: "3 BHK Apartment", listingIntent: "Buy", propertyType: "Apartment", price: 8_500_000, locality: "Dharampeth", city: "Nagpur", latitude: 21.14, longitude: 79.05, image: { src: "/images/properties/property-01.svg", alt: "Apartment", kind: "illustrative" }, bedrooms: 3, bathrooms: 2, areaSqFt: 1450, status: "Ready to Move", reraApproved: true },
 ];
 
 describe("PropertyResults", () => {

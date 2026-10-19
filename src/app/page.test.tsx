@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
-import { HomeClient } from "@/components/home/HomeClient";
+import { PropertyExplorer } from "@/components/properties/PropertyExplorer";
+import { NAGPUR_PROPERTIES } from "@/data/properties";
 
 const mapHarness = vi.hoisted(() => ({
   props: null as null | Record<string, unknown>,
@@ -23,7 +24,7 @@ beforeEach(() => {
 });
 
 function renderHome() {
-  return render(<HomeClient accountControl={<span>Account</span>} />);
+  return render(<PropertyExplorer accountControl={<span>Account</span>} initialProperties={NAGPUR_PROPERTIES} inventoryMode="published" />);
 }
 
 it("exposes the SAT12 property results landmark", () => {
@@ -71,4 +72,26 @@ it("defers the map in mobile list view and mounts it after switching", async () 
   expect(screen.queryByTestId("property-map")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Map" }));
   expect(screen.getByTestId("property-map")).toBeInTheDocument();
+});
+
+it("shows a truthful inventory state instead of mock listings when Supabase returns no rows", () => {
+  render(<PropertyExplorer accountControl={<span>Account</span>} initialProperties={[]} inventoryMode="published" />);
+  expect(screen.getByRole("heading", { name: "No published properties yet" })).toBeInTheDocument();
+  expect(screen.queryAllByTestId("property-card")).toHaveLength(0);
+  expect(screen.queryByRole("button", { name: "Clear all filters" })).not.toBeInTheDocument();
+});
+
+it("labels seven development demos while preserving Buy and Rent filtering", async () => {
+  const user = userEvent.setup();
+  render(<PropertyExplorer accountControl={<span>Account</span>} initialProperties={NAGPUR_PROPERTIES.slice(0, 7)} inventoryMode="demo" />);
+  expect(screen.getByRole("status", { name: "Demo listings notice" })).toHaveTextContent("sample listings for development");
+  expect(screen.getAllByTestId("property-card")).toHaveLength(5);
+  expect(screen.getByTestId("property-map")).toHaveAttribute("data-property-ids", NAGPUR_PROPERTIES.slice(0, 5).map(({ id }) => id).join(","));
+  await user.click(screen.getByRole("button", { name: "Rent" }));
+  expect(screen.getAllByTestId("property-card")).toHaveLength(2);
+});
+
+it("does not show the demo notice for published inventory", () => {
+  renderHome();
+  expect(screen.queryByRole("status", { name: "Demo listings notice" })).not.toBeInTheDocument();
 });

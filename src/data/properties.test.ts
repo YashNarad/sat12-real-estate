@@ -13,7 +13,7 @@ describe("Nagpur property imagery", () => {
     for (const image of images) {
       expect(image.src).toMatch(/^\/images\/properties\/property-\d{2}\.webp$/);
       expect(image.alt).toMatch(/^Illustrative /);
-      expect(image.license).toBe("SAT12 generated illustrative image");
+      expect(image.kind).toBe("illustrative");
       expect(existsSync(join(process.cwd(), "public", image.src))).toBe(true);
     }
   });

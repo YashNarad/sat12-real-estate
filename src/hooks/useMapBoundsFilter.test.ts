@@ -17,7 +17,7 @@ function propertyAt(id: string, latitude: number, longitude: number): Property {
     city: "Nagpur",
     latitude,
     longitude,
-    image: { src: "/images/properties/dharampeth-apartment.webp", alt: id, license: "SAT12 generated illustrative image" },
+    image: { src: "/images/properties/dharampeth-apartment.webp", alt: id, kind: "illustrative" },
     bedrooms: 3,
     bathrooms: 2,
     areaSqFt: 1450,

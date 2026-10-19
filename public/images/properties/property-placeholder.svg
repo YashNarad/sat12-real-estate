@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 525" role="img" aria-labelledby="title description">
+  <title id="title">Property image unavailable</title>
+  <desc id="description">Neutral SAT12 property placeholder</desc>
+  <rect width="900" height="525" fill="#f4f4f5"/>
+  <path d="M280 338V225l170-118 170 118v113h-92v-91H372v91z" fill="#d4d4d8"/>
+  <path d="M250 232 450 92l200 140" fill="none" stroke="#a1a1aa" stroke-linecap="round" stroke-linejoin="round" stroke-width="28"/>
+  <circle cx="450" cy="221" r="28" fill="#dc0011" opacity=".75"/>
+  <text x="450" y="418" fill="#52525b" font-family="Arial, sans-serif" font-size="28" text-anchor="middle">Image unavailable</text>
+</svg>
