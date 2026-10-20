@@ -18,6 +18,15 @@ it("covers the approved private Storage threat model", async () => {
     "path and row image ids must match",
     "owner cannot change property ownership",
     "owner cannot change revision status through metadata privileges",
+    "metadata-backed owner read remains independent of orphan policy",
+    "orphan delete helper is false while metadata exists",
+    "owner removes editable metadata to create an orphan",
+    "owner selects a deletable orphan image",
+    "owner may delete the selected orphan image",
+    "cross-owner orphan image remains private",
+    "submitted orphan image remains private",
+    "published orphan image remains private",
+    "legally held orphan image remains private",
     "cross-owner upload is denied",
     "cross-revision upload is denied",
     "path traversal is denied",
@@ -47,8 +56,8 @@ it("keeps unsupported Storage object mutations out of transactional pgTAP", asyn
   const assertions = source.match(
     /select\s+extensions\.(?:is|ok|lives_ok|throws_ok|results_eq)\s*\(/giu,
   );
-  expect(source).toMatch(/extensions\.plan\(19\)/u);
-  expect(assertions).toHaveLength(19);
+  expect(source).toMatch(/extensions\.plan\(28\)/u);
+  expect(assertions).toHaveLength(28);
 });
 
 it("clears authenticated JWT claims before exercising anonymous image access", async () => {

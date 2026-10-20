@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   executeStorageApiTestRun,
+  expectEffectiveDelete,
   recoverFailedFixtureSetup,
   runCleanupSteps,
   runStorageApiSecurityScenarios,
@@ -41,6 +42,16 @@ describe("Storage API test guard", () => {
 });
 
 describe("authenticated Storage API security scenarios", () => {
+  it("classifies an empty successful delete response as ineffective", () => {
+    expect(() => expectEffectiveDelete({ data: [], error: null })).toThrow(
+      "SAT12_STORAGE_API_DELETE_NO_EFFECT",
+    );
+    expect(() =>
+      expectEffectiveDelete({ data: null, error: new Error("denied") }),
+    ).toThrow("SAT12_STORAGE_API_EDITABLE_DELETE_FAILED");
+    expect(() => expectEffectiveDelete({ data: [{ name: "draft.webp" }], error: null })).not.toThrow();
+  });
+
   it("checks update and delete boundaries without using an operator client for actions", async () => {
     const existing = new Set(["submitted.webp", "published.webp", "held.webp"]);
     const owner = {
@@ -51,14 +62,17 @@ describe("authenticated Storage API security scenarios", () => {
       }),
       update: vi.fn(async () => ({ error: new Error("RLS denied") })),
       remove: vi.fn(async (paths: string[]) => {
+        const data: Array<{ name: string }> = [];
         for (const path of paths) {
-          if (path === "draft.webp" && metadataDeleted) existing.delete(path);
+          if (path === "draft.webp" && metadataDeleted && existing.delete(path)) {
+            data.push({ name: path });
+          }
         }
-        return { error: null };
+        return { data, error: null };
       }),
     };
     const otherOwner = {
-      remove: vi.fn(async () => ({ error: null })),
+      remove: vi.fn(async () => ({ data: [], error: null })),
     };
     let metadataDeleted = false;
     const recordDraftMetadata = vi.fn(async () => undefined);

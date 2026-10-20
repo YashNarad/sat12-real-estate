@@ -21,6 +21,13 @@ function expectApiSuccess(result, errorCode) {
   if (result?.error) throw new Error(errorCode);
 }
 
+export function expectEffectiveDelete(result) {
+  if (result?.error) throw new Error("SAT12_STORAGE_API_EDITABLE_DELETE_FAILED");
+  if (!Array.isArray(result?.data) || result.data.length === 0) {
+    throw new Error("SAT12_STORAGE_API_DELETE_NO_EFFECT");
+  }
+}
+
 async function expectObjectState(observer, pathValue, expected, description) {
   const actual = await observer.exists(pathValue);
   if (actual !== expected) throw new Error(`SAT12_STORAGE_API_ASSERTION_FAILED: ${description}`);
@@ -81,10 +88,7 @@ export async function runStorageApiSecurityScenarios(input) {
   passed.push("legal-hold delete denied");
 
   await input.deleteDraftMetadata();
-  expectApiSuccess(
-    await input.owner.remove([input.paths.draft]),
-    "SAT12_STORAGE_API_EDITABLE_DELETE_FAILED",
-  );
+  expectEffectiveDelete(await input.owner.remove([input.paths.draft]));
   await expectObjectState(input.observer, input.paths.draft, false, "editable delete");
   passed.push("editable delete succeeds");
 

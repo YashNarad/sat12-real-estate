@@ -1,4 +1,4 @@
-select extensions.plan(19);
+select extensions.plan(28);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
@@ -51,7 +51,8 @@ insert into storage.objects (id, bucket_id, name, owner_id, metadata) values
   ('44000000-0000-4000-8000-000000000015', 'property-images', '41000000-0000-4000-8000-000000000002/42000000-0000-4000-8000-000000000004/43000000-0000-4000-8000-000000000004/44000000-0000-4000-8000-000000000015.webp', '41000000-0000-4000-8000-000000000002', '{"mimetype":"image/webp","size":400000}'),
   ('44000000-0000-4000-8000-000000000016', 'property-images', '41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000002/43000000-0000-4000-8000-000000000002/44000000-0000-4000-8000-000000000016.webp', '41000000-0000-4000-8000-000000000001', '{"mimetype":"image/webp","size":400000}'),
   ('44000000-0000-4000-8000-000000000017', 'property-images', '41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000003/43000000-0000-4000-8000-000000000003/44000000-0000-4000-8000-000000000017.webp', '41000000-0000-4000-8000-000000000001', '{"mimetype":"image/webp","size":400000}'),
-  ('44000000-0000-4000-8000-000000000018', 'property-images', '41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000001/44000000-0000-4000-8000-000000000018.webp', '41000000-0000-4000-8000-000000000001', '{"mimetype":"image/webp","size":400000}');
+  ('44000000-0000-4000-8000-000000000018', 'property-images', '41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000001/44000000-0000-4000-8000-000000000018.webp', '41000000-0000-4000-8000-000000000001', '{"mimetype":"image/webp","size":400000}'),
+  ('44000000-0000-4000-8000-000000000020', 'property-images', '41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000001/44000000-0000-4000-8000-000000000020.webp', '41000000-0000-4000-8000-000000000001', '{"mimetype":"image/webp","size":400000}');
 insert into public.property_images (id, revision_id, storage_path, alt_text, position, width, height, size_bytes, mime_type, source_kind, created_by) values
   ('44000000-0000-4000-8000-000000000001', '43000000-0000-4000-8000-000000000001', '41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000001/44000000-0000-4000-8000-000000000001.webp', 'Draft living room', 0, 1200, 800, 400000, 'image/webp', 'owner_uploaded', '41000000-0000-4000-8000-000000000001'),
   ('44000000-0000-4000-8000-000000000003', '43000000-0000-4000-8000-000000000003', '41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000003/43000000-0000-4000-8000-000000000003/44000000-0000-4000-8000-000000000003.webp', 'Published living room', 0, 1200, 800, 400000, 'image/webp', 'owner_uploaded', '41000000-0000-4000-8000-000000000001'),
@@ -60,7 +61,9 @@ insert into public.property_images (id, revision_id, storage_path, alt_text, pos
   ('44000000-0000-4000-8000-000000000006', '43000000-0000-4000-8000-000000000006', '41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000006/43000000-0000-4000-8000-000000000006/44000000-0000-4000-8000-000000000006.webp', 'Superseded living room', 0, 1200, 800, 400000, 'image/webp', 'owner_uploaded', '41000000-0000-4000-8000-000000000001'),
   ('44000000-0000-4000-8000-000000000007', '43000000-0000-4000-8000-000000000007', '41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000007/43000000-0000-4000-8000-000000000007/44000000-0000-4000-8000-000000000007.webp', 'Archived living room', 0, 1200, 800, 400000, 'image/webp', 'owner_uploaded', '41000000-0000-4000-8000-000000000001');
 insert into public.legal_holds (entity_kind, entity_id, reason, created_by)
-values ('image', '44000000-0000-4000-8000-000000000004', 'Preserve disputed image', '41000000-0000-4000-8000-000000000003');
+values
+  ('image', '44000000-0000-4000-8000-000000000004', 'Preserve disputed image', '41000000-0000-4000-8000-000000000003'),
+  ('image', '44000000-0000-4000-8000-000000000020', 'Preserve orphaned disputed image', '41000000-0000-4000-8000-000000000003');
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"41000000-0000-4000-8000-000000000001","aal":"aal1","role":"authenticated"}', true);
@@ -71,6 +74,14 @@ select extensions.lives_ok(
 select extensions.lives_ok(
   $$insert into public.property_images (id, revision_id, storage_path, alt_text, position, width, height, size_bytes, mime_type, source_kind, created_by) values ('44000000-0000-4000-8000-000000000010', '43000000-0000-4000-8000-000000000001', '41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000001/44000000-0000-4000-8000-000000000010.webp', 'Owner uploaded kitchen', 2, 1200, 800, 400000, 'image/webp', 'owner_uploaded', '41000000-0000-4000-8000-000000000001')$$,
   'owner records metadata with matching pre-generated image id'
+);
+select extensions.ok(
+  exists (select 1 from storage.objects where id = '44000000-0000-4000-8000-000000000010'),
+  'metadata-backed owner read remains independent of orphan policy'
+);
+select extensions.ok(
+  not private.can_delete_property_image_object('41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000001/44000000-0000-4000-8000-000000000010.webp'),
+  'orphan delete helper is false while metadata exists'
 );
 select extensions.throws_ok(
   $$insert into public.property_images (id, revision_id, storage_path, alt_text, position, width, height, size_bytes, mime_type, source_kind, created_by) values ('44000000-0000-4000-8000-000000000015', '43000000-0000-4000-8000-000000000004', '41000000-0000-4000-8000-000000000002/42000000-0000-4000-8000-000000000004/43000000-0000-4000-8000-000000000004/44000000-0000-4000-8000-000000000015.webp', 'Other owner bedroom', 0, 1200, 800, 400000, 'image/webp', 'owner_uploaded', '41000000-0000-4000-8000-000000000002')$$,
@@ -122,6 +133,38 @@ select extensions.results_eq(
   ) select count(*) from deleted$mutation$,
   $expected$values (0::bigint)$expected$,
   'legally held metadata deletion is denied'
+);
+select extensions.lives_ok(
+  $$delete from public.property_images where id = '44000000-0000-4000-8000-000000000010'$$,
+  'owner removes editable metadata to create an orphan'
+);
+select extensions.ok(
+  exists (select 1 from storage.objects where id = '44000000-0000-4000-8000-000000000010'),
+  'owner selects a deletable orphan image'
+);
+select extensions.ok(
+  private.can_delete_property_image_object('41000000-0000-4000-8000-000000000001/42000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000001/44000000-0000-4000-8000-000000000010.webp'),
+  'owner may delete the selected orphan image'
+);
+select extensions.is(
+  (select count(*) from storage.objects where id = '44000000-0000-4000-8000-000000000015'),
+  0::bigint,
+  'cross-owner orphan image remains private'
+);
+select extensions.is(
+  (select count(*) from storage.objects where id = '44000000-0000-4000-8000-000000000016'),
+  0::bigint,
+  'submitted orphan image remains private'
+);
+select extensions.is(
+  (select count(*) from storage.objects where id = '44000000-0000-4000-8000-000000000017'),
+  0::bigint,
+  'published orphan image remains private'
+);
+select extensions.is(
+  (select count(*) from storage.objects where id = '44000000-0000-4000-8000-000000000020'),
+  0::bigint,
+  'legally held orphan image remains private'
 );
 reset role;
 

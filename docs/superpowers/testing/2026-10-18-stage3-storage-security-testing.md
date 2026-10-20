@@ -12,7 +12,7 @@ Command (requires separately approved `test:<project-ref>`):
 npm run test:db:cloud -- supabase/tests/storage_rls.test.sql
 ```
 
-The repository-owned runner opens one PostgreSQL transaction for the complete file and always rolls it back. The 12 assertions cover:
+The repository-owned runner opens one PostgreSQL transaction for the complete file and always rolls it back. The 28 assertions cover:
 
 - exact owner/revision upload-prefix decisions;
 - cross-owner, cross-revision, traversal, and unsupported-bucket denial;
@@ -21,6 +21,14 @@ The repository-owned runner opens one PostgreSQL transaction for the complete fi
 - owner access to owned revision images;
 - AAL1-admin denial and AAL2-admin access;
 - rejection of metadata that references a nonexistent object.
+
+### Editable orphan cleanup visibility
+
+The installed `@supabase/storage-js` client requires both `select` and `delete` on `storage.objects` for `remove()`. Storage RLS does not expose a narrower operation-specific SELECT mode, so editable orphan cleanup uses a separate authenticated SELECT policy backed by `private.can_delete_property_image_object(name)`.
+
+PostgreSQL permissive policies are combined with OR. The orphan policy therefore supplements the existing image-read policy without restricting legitimate metadata-backed owner, administrator, or published-image reads. It grants the authorized owner SELECT visibility for an exact orphan object only when the existing delete helper confirms path ownership, an editable revision, absence of image metadata, and absence of a legal hold. That SELECT visibility is not delete-only: for an eligible orphan it can also permit exact-object download, signed-URL creation, and discovery through Storage listing APIs. Cross-owner, submitted, published, legally held, malformed-path, and still-metadata-backed objects do not qualify through this policy.
+
+Because this is the narrowest authorization primitive supported by the installed Storage stack, callers must keep deletion paths exact and proceed immediately from metadata removal to object cleanup. The transactional suite covers the policy boundary; the separately approved Storage API suite verifies the end-to-end deletion behavior.
 
 Direct Storage object UPDATE, UPSERT, and DELETE statements are forbidden in this suite by a local regression test.
 
