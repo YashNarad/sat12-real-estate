@@ -5,6 +5,7 @@ import {
   recoverFailedFixtureSetup,
   runCleanupSteps,
   runStorageApiSecurityScenarios,
+  verifyFixtureCleanup,
   validateStorageApiTestOperation,
 } from "./storage-api-tests.mjs";
 
@@ -114,6 +115,66 @@ describe("authenticated Storage API security scenarios", () => {
 });
 
 describe("Storage API cleanup", () => {
+  it("fails cleanup verification when a run-created profile remains", async () => {
+    const end = vi.fn(async () => undefined);
+    const query = vi.fn(async (sql: string) => {
+      expect(sql).toContain("from public.profiles");
+      expect(sql).toContain("from public.legal_holds");
+      return {
+        rows: [{
+          users: 0,
+          profiles: 1,
+          properties: 0,
+          revisions: 0,
+          metadata: 0,
+          legal_holds: 0,
+          objects: 0,
+        }],
+      };
+    });
+
+    await expect(
+      verifyFixtureCleanup({
+        database: { query, end },
+        userIds: ["00000000-0000-0000-0000-000000000001"],
+        propertyIds: [],
+        revisionIds: [],
+        imageIds: [],
+        paths: {},
+      }),
+    ).rejects.toThrow("SAT12_STORAGE_API_CLEANUP_VERIFICATION_FAILED");
+
+    expect(end).toHaveBeenCalledOnce();
+  });
+
+  it("fails cleanup verification when a run-created legal hold remains", async () => {
+    const end = vi.fn(async () => undefined);
+    const query = vi.fn(async () => ({
+      rows: [{
+        users: 0,
+        profiles: 0,
+        properties: 0,
+        revisions: 0,
+        metadata: 0,
+        legal_holds: 1,
+        objects: 0,
+      }],
+    }));
+
+    await expect(
+      verifyFixtureCleanup({
+        database: { query, end },
+        userIds: [],
+        propertyIds: [],
+        revisionIds: [],
+        imageIds: ["00000000-0000-0000-0000-000000000002"],
+        paths: {},
+      }),
+    ).rejects.toThrow("SAT12_STORAGE_API_CLEANUP_VERIFICATION_FAILED");
+
+    expect(end).toHaveBeenCalledOnce();
+  });
+
   it("cleans and verifies a partially created fixture before reporting setup failure", async () => {
     const fixture = { runId: "partial-run" };
     const cleanup = vi.fn(async () => {

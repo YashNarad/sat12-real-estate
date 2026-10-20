@@ -56,7 +56,7 @@ Storage API calls are not transactionally reversible. Cleanup therefore runs in 
 2. remove only the four known run-scoped object paths through the Storage API;
 3. remove only the four run-scoped properties/revisions;
 4. remove only the two run-scoped Auth users;
-5. query Auth, properties, revisions, metadata, and Storage objects by their generated IDs/paths and require zero remaining rows.
+5. query Auth users, trigger-created profiles, properties, revisions, image metadata, legal holds, and Storage objects by their generated IDs/paths and require zero remaining rows.
 
 Post-cleanup verification still runs if cleanup reports an error so any residue is reported explicitly. The runner never resets a database, enumerates or deletes unrelated prefixes, or uses a shared fixture identity.
 

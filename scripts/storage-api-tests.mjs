@@ -323,14 +323,16 @@ async function cleanupFixtureResources(fixture) {
   await runCleanupSteps(steps);
 }
 
-async function verifyFixtureCleanup(fixture) {
+export async function verifyFixtureCleanup(fixture) {
   try {
     const result = await fixture.database.query(
       `select
         (select count(*)::int from auth.users where id = any($1::uuid[])) as users,
+        (select count(*)::int from public.profiles where id = any($1::uuid[])) as profiles,
         (select count(*)::int from public.properties where id = any($2::uuid[])) as properties,
         (select count(*)::int from public.property_revisions where id = any($3::uuid[])) as revisions,
         (select count(*)::int from public.property_images where id = any($4::uuid[])) as metadata,
+        (select count(*)::int from public.legal_holds where entity_id = any($4::uuid[])) as legal_holds,
         (select count(*)::int from storage.objects where bucket_id=$5 and name = any($6::text[])) as objects`,
       [fixture.userIds, fixture.propertyIds, fixture.revisionIds, fixture.imageIds, BUCKET, Object.values(fixture.paths)],
     );
