@@ -11,6 +11,13 @@ it("covers the approved private Storage threat model", async () => {
 
   for (const description of [
     "owner uploads to exact revision prefix",
+    "owner records metadata with matching pre-generated image id",
+    "cross-owner image metadata insert is denied",
+    "submitted revision image metadata insert is denied",
+    "published revision image metadata insert is denied",
+    "path and row image ids must match",
+    "owner cannot change property ownership",
+    "owner cannot change revision status through metadata privileges",
     "cross-owner upload is denied",
     "cross-revision upload is denied",
     "path traversal is denied",
@@ -40,8 +47,8 @@ it("keeps unsupported Storage object mutations out of transactional pgTAP", asyn
   const assertions = source.match(
     /select\s+extensions\.(?:is|ok|lives_ok|throws_ok|results_eq)\s*\(/giu,
   );
-  expect(source).toMatch(/extensions\.plan\(12\)/u);
-  expect(assertions).toHaveLength(12);
+  expect(source).toMatch(/extensions\.plan\(19\)/u);
+  expect(assertions).toHaveLength(19);
 });
 
 it("clears authenticated JWT claims before exercising anonymous image access", async () => {
