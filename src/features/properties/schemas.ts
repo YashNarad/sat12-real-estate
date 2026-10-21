@@ -16,7 +16,7 @@ export const propertyDraftSchema = z.object({
   bedrooms: z.coerce.number().int().min(0).max(20), bathrooms: z.coerce.number().int().min(0).max(20),
   areaSqFt: z.coerce.number().int().positive().max(1_000_000),
   constructionStatus: z.enum(["ready_to_move", "under_construction"]),
-  reraApproved: z.coerce.boolean(), reraNumber: z.string().trim().max(80),
+  reraApproved: z.boolean(), reraNumber: z.string().trim().max(80),
   updatedAt: z.string().datetime().optional(),
 }).superRefine((value, context) => {
   if (value.propertyType === "plot" && value.bedrooms !== 0)

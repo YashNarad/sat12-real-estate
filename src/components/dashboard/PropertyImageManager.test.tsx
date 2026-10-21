@@ -17,7 +17,8 @@ describe("PropertyImageManager", () => {
   it("offers MIME-restricted image upload for editable revisions", () => {
     render(<PropertyImageManager editable propertyId="property" revisionId="revision" />);
     expect(screen.getByLabelText(/image description/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /upload image/i })).toBeEnabled();
+    expect(screen.getByLabelText(/property image/i)).toHaveAttribute("accept", "image/jpeg,image/png,image/webp");
+    expect(screen.getByRole("button", { name: /upload image/i })).toBeDisabled();
   });
 
   it("fails closed when the revision already has twelve images", () => {
