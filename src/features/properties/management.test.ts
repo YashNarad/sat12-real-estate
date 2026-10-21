@@ -50,6 +50,13 @@ describe("owner property management service", () => {
     expect(db.rpc).toHaveBeenCalledWith("create_listing_revision", { p_property_id: "property-1" });
   });
 
+  it("makes draft updates conditional on the verified timestamp", async () => {
+    const db = client();
+    const result = await createPropertyManagementService(db, principal).updateDraft("revision-1", draft);
+    expect(result.ok).toBe(true);
+    expect(db.updateRevision).toHaveBeenCalledWith("revision-1", expect.any(Object), draft.updatedAt);
+  });
+
   it("submits through the lifecycle RPC and maps RLS failures safely", async () => {
     const db = client({ rpc: vi.fn(async () => ({ data: null, error: { code: "42501" } })) });
     await expect(createPropertyManagementService(db, principal).submitListing("revision-1"))

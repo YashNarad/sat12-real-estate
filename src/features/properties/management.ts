@@ -5,8 +5,11 @@ type Principal = { id: string; role: "owner_agent" | "admin" };
 type Result<T = unknown> = { data: T | null; error: null | { code?: string; message?: string } };
 interface ManagementClient {
   rpc(name: string, args: Record<string, unknown>): Promise<Result>;
-  getRevision(id: string): Promise<Result<Record<string, any>>>;
-  updateRevision(id: string, fields: Record<string, unknown>): Promise<Result>;
+  getRevision(id: string): Promise<Result<{
+    id?: string; property_id?: string; status?: string; updated_at?: string;
+    properties?: { owner_id?: string; published_revision_id?: string | null };
+  }>>;
+  updateRevision(id: string, fields: Record<string, unknown>, expectedUpdatedAt?: string): Promise<Result>;
   deleteRevision(id: string): Promise<{ error: unknown }>;
   insertImage(fields: Record<string, unknown>): Promise<Result>;
   deleteImage(id: string): Promise<{ error: unknown }>;
@@ -14,8 +17,10 @@ interface ManagementClient {
 
 function failure(error: unknown): ActionState {
   const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+  const message = typeof error === "object" && error && "message" in error ? String(error.message) : "";
   if (code === "42501") return { ok: false, code: "FORBIDDEN", message: "You do not have permission to make that change." };
-  if (code === "23505" || code === "SAT12_STALE_REVISION_STATE") return { ok: false, code: "CONFLICT", message: "This listing changed. Refresh and try again." };
+  if (code === "NOT_FOUND") return { ok: false, code: "NOT_FOUND", message: "The listing could not be found." };
+  if (code === "23505" || code === "SAT12_STALE_REVISION_STATE" || message.includes("SAT12_STALE_REVISION_STATE")) return { ok: false, code: "CONFLICT", message: "This listing changed. Refresh and try again." };
   return { ok: false, code: "RETRYABLE", message: "We could not save the listing. Please try again." };
 }
 
@@ -37,7 +42,7 @@ export function createPropertyManagementService(client: ManagementClient, princi
     if (result.error || !result.data) return { error: { code: "NOT_FOUND" } } as const;
     const row = result.data;
     if (row.properties?.owner_id !== principal.id) return { error: { code: "42501" } } as const;
-    if (!(["draft", "rejected"] as string[]).includes(row.status)) return { error: { code: "SAT12_STALE_REVISION_STATE" } } as const;
+    if (typeof row.status !== "string" || !(["draft", "rejected"] as string[]).includes(row.status)) return { error: { code: "SAT12_STALE_REVISION_STATE" } } as const;
     if (updatedAt && row.updated_at !== updatedAt) return { error: { code: "23505" } } as const;
     return { row } as const;
   }
@@ -58,7 +63,7 @@ export function createPropertyManagementService(client: ManagementClient, princi
       if (!parsed.success) return { ok: false, code: "VALIDATION", message: "Check the highlighted fields.", fieldErrors: parsed.error.flatten().fieldErrors };
       const access = await editable(revisionId, parsed.data.updatedAt);
       if ("error" in access) return failure(access.error);
-      const result = await client.updateRevision(revisionId, rpcPayload(parsed.data));
+      const result = await client.updateRevision(revisionId, rpcPayload(parsed.data), parsed.data.updatedAt);
       return result.error ? failure(result.error) : { ok: true, message: "Draft saved.", data: result.data };
     },
     async deleteDraft(revisionId: string): Promise<ActionState> {

@@ -4,6 +4,13 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    serverActions: {
+      // Property images are validated again at 5 MiB in the action. The small
+      // overhead allowance keeps valid multipart uploads below this hard cap.
+      bodySizeLimit: "6mb",
+    },
+  },
   images: {
     remotePatterns: [
       {
