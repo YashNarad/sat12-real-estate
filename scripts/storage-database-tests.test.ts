@@ -18,11 +18,11 @@ it("covers the approved private Storage threat model", async () => {
     "path and row image ids must match",
     "owner cannot change property ownership",
     "owner cannot change revision status through metadata privileges",
+    "metadata-backed cross-owner fixture exists",
     "metadata-backed owner read remains independent of orphan policy",
-    "orphan delete helper is false while metadata exists",
+    "metadata-backed cross-owner image remains private",
     "owner removes editable metadata to create an orphan",
     "owner selects a deletable orphan image",
-    "owner may delete the selected orphan image",
     "cross-owner orphan image remains private",
     "submitted orphan image remains private",
     "published orphan image remains private",
@@ -58,6 +58,15 @@ it("keeps unsupported Storage object mutations out of transactional pgTAP", asyn
   );
   expect(source).toMatch(/extensions\.plan\(28\)/u);
   expect(assertions).toHaveLength(28);
+});
+
+it("does not invoke private helpers directly from application-role assertions", async () => {
+  const source = await readFile(
+    path.resolve("supabase/tests/storage_rls.test.sql"),
+    "utf8",
+  );
+
+  expect(source).not.toMatch(/\bprivate\.[a-z_][a-z0-9_]*\s*\(/iu);
 });
 
 it("clears authenticated JWT claims before exercising anonymous image access", async () => {
