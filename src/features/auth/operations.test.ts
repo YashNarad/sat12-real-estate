@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  classifyMfaEnrollmentFailure,
   enrollTotp,
   loginWithPassword,
   requestPasswordRecovery,
@@ -153,5 +154,52 @@ describe("authentication operations", () => {
         secret: "SECRET",
       },
     });
+  });
+
+  it.each([
+    ["mfa_factor_name_conflict", "factor_conflict"],
+    ["too_many_enrolled_mfa_factors", "factor_conflict"],
+    ["mfa_verified_factor_exists", "factor_conflict"],
+    ["mfa_totp_enroll_not_enabled", "enrollment_unavailable"],
+    ["session_expired", "authentication_required"],
+    ["bad_jwt", "authentication_required"],
+    ["unexpected_failure", "provider_error"],
+  ])("classifies MFA provider code %s without using provider messages", (code, expected) => {
+    expect(classifyMfaEnrollmentFailure({
+      code,
+      message: "sensitive provider detail that must not be surfaced",
+    })).toBe(expected);
+  });
+
+  it("classifies missing TOTP enrollment material separately", async () => {
+    const diagnostics: string[] = [];
+    await expect(enrollTotp({
+      enroll: vi.fn().mockResolvedValue({ data: { id: "factor-1" }, error: null }),
+    }, {
+      reportDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    })).resolves.toEqual({
+      ok: false,
+      message: "Unable to start MFA enrollment.",
+    });
+    expect(diagnostics).toEqual(["malformed_enrollment_response"]);
+  });
+
+  it("reports only a sanitized MFA diagnostic classification", async () => {
+    const diagnostics: string[] = [];
+    await expect(enrollTotp({
+      enroll: vi.fn().mockResolvedValue({
+        data: null,
+        error: {
+          code: "mfa_factor_name_conflict",
+          message: "factor secret and provider detail",
+        },
+      }),
+    }, {
+      reportDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    })).resolves.toEqual({
+      ok: false,
+      message: "An authenticator is already enrolled or awaiting verification.",
+    });
+    expect(diagnostics).toEqual(["factor_conflict"]);
   });
 });

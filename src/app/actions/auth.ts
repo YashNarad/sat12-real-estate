@@ -75,7 +75,13 @@ export async function enrollMfaAction(_state: AuthActionState) {
   } catch {
     return { ok: false, message: "Sign in again before enrolling MFA." };
   }
-  return enrollTotp(client.auth.mfa);
+  return enrollTotp(client.auth.mfa, {
+    reportDiagnostic: (diagnostic) => {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`[SAT12_AUTH] MFA enrollment failed: ${diagnostic}`);
+      }
+    },
+  });
 }
 
 export async function verifyMfaAction(_state: AuthActionState, formData: FormData) {

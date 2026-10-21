@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 
 import { logoutAction } from "@/app/actions/auth";
 import { AuthorizationError, requireUser } from "@/features/auth/authorization";
@@ -6,6 +7,7 @@ import { AuthorizationError, requireUser } from "@/features/auth/authorization";
 export const instant = false;
 
 export default async function AccountPage() {
+  await connection();
   let principal;
   try {
     principal = await requireUser();

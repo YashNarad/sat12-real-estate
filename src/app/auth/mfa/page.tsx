@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 
 import { enrollMfaAction, verifyMfaAction } from "@/app/actions/auth";
 import { MfaEnrollmentForm, TotpChallengeForm } from "@/components/auth/MfaForm";
@@ -9,6 +10,7 @@ import { createServerClient } from "@/lib/supabase/server";
 export const instant = false;
 
 export default async function MfaPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  await connection();
   const client = await createServerClient();
   const next = safeReturnPath((await searchParams).next, "/account");
   try {

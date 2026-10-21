@@ -163,10 +163,70 @@ interface TotpEnrollmentApi {
   }>;
 }
 
-export async function enrollTotp(auth: TotpEnrollmentApi): Promise<AuthActionState> {
+export type MfaEnrollmentDiagnostic =
+  | "factor_conflict"
+  | "enrollment_unavailable"
+  | "authentication_required"
+  | "provider_error"
+  | "malformed_enrollment_response";
+
+type ProviderErrorShape = { code?: unknown; status?: unknown };
+
+export function classifyMfaEnrollmentFailure(error: unknown): Exclude<MfaEnrollmentDiagnostic, "malformed_enrollment_response"> {
+  const providerError = error && typeof error === "object" ? error as ProviderErrorShape : {};
+  const code = typeof providerError.code === "string" ? providerError.code : "";
+  if ([
+    "mfa_factor_name_conflict",
+    "too_many_enrolled_mfa_factors",
+    "mfa_verified_factor_exists",
+    "conflict",
+  ].includes(code)) return "factor_conflict";
+  if (["mfa_totp_enroll_not_enabled", "provider_disabled"].includes(code)) {
+    return "enrollment_unavailable";
+  }
+  if ([
+    "bad_jwt",
+    "no_authorization",
+    "session_not_found",
+    "session_expired",
+    "refresh_token_not_found",
+    "refresh_token_already_used",
+    "user_banned",
+    "invalid_credentials",
+  ].includes(code) || providerError.status === 401) return "authentication_required";
+  return "provider_error";
+}
+
+function enrollmentFailureMessage(diagnostic: MfaEnrollmentDiagnostic) {
+  if (diagnostic === "factor_conflict") {
+    return "An authenticator is already enrolled or awaiting verification.";
+  }
+  if (diagnostic === "enrollment_unavailable") {
+    return "Authenticator enrollment is currently unavailable.";
+  }
+  if (diagnostic === "authentication_required") {
+    return "Sign in again before enrolling MFA.";
+  }
+  return "Unable to start MFA enrollment.";
+}
+
+export async function enrollTotp(
+  auth: TotpEnrollmentApi,
+  options: { reportDiagnostic?: (diagnostic: MfaEnrollmentDiagnostic) => void } = {},
+): Promise<AuthActionState> {
   const result = await auth.enroll({ factorType: "totp", friendlyName: "SAT12 Authenticator" });
-  if (result.error || !result.data?.totp) {
-    return { ok: false, message: "Unable to start MFA enrollment." };
+  if (result.error) {
+    const diagnostic = classifyMfaEnrollmentFailure(result.error);
+    options.reportDiagnostic?.(diagnostic);
+    return { ok: false, message: enrollmentFailureMessage(diagnostic) };
+  }
+  if (
+    !result.data?.id
+    || !result.data.totp?.qr_code
+    || !result.data.totp.secret
+  ) {
+    options.reportDiagnostic?.("malformed_enrollment_response");
+    return { ok: false, message: enrollmentFailureMessage("malformed_enrollment_response") };
   }
   return {
     ok: true,
