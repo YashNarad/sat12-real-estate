@@ -93,9 +93,14 @@ export function createMfaCleanupOperator(client, roleReader) {
       return data.factors;
     },
     async deleteFactor(userId, id) {
-      const { data, error } = await client.auth.admin.mfa.deleteFactor({ userId, id });
-      if (error || data?.id !== id) throw new Error("SAT12_MFA_CLEANUP_DELETE_FAILED");
-      return data;
+      try {
+        const { data, error } = await client.auth.admin.mfa.deleteFactor({ userId, id });
+        if (error) throw new Error("SAT12_MFA_CLEANUP_DELETE_FAILED");
+        const responseId = data?.id ?? data?.data?.id;
+        return { acknowledged: responseId === id };
+      } catch {
+        throw new Error("SAT12_MFA_CLEANUP_DELETE_FAILED");
+      }
     },
   };
 }
@@ -136,21 +141,25 @@ export async function runMfaFactorCleanup(env = process.env, options = {}) {
     assertRoleState(await operator.getRoleState(target.id));
     const candidate = resolveOnlyStaleTotp(await operator.listFactors(target.id));
 
-    try {
-      await operator.deleteFactor(target.id, candidate.id);
-    } catch {
-      throw new Error("SAT12_MFA_CLEANUP_DELETE_FAILED");
-    }
+    await operator.deleteFactor(target.id, candidate.id).catch(() => null);
 
-    const [remainingFactors, finalRoleState] = await Promise.all([
-      operator.listFactors(target.id),
-      operator.getRoleState(target.id),
-    ]);
-    if (remainingFactors.length !== 0
-      || finalRoleState.role !== "user"
-      || finalRoleState.adminCount !== 0) {
+    let remainingFactors;
+    let finalRoleState;
+    try {
+      [remainingFactors, finalRoleState] = await Promise.all([
+        operator.listFactors(target.id),
+        operator.getRoleState(target.id),
+      ]);
+    } catch {
+      throw new Error("SAT12_MFA_CLEANUP_OUTCOME_UNCERTAIN");
+    }
+    if (finalRoleState.role !== "user" || finalRoleState.adminCount !== 0) {
       throw new Error("SAT12_MFA_CLEANUP_POSTCHECK_FAILED");
     }
+    if (remainingFactors.some((factor) => factor.id === candidate.id)) {
+      throw new Error("SAT12_MFA_CLEANUP_DELETE_FAILED");
+    }
+    if (remainingFactors.length !== 0) throw new Error("SAT12_MFA_CLEANUP_POSTCHECK_FAILED");
     (options.write ?? ((message) => process.stdout.write(message)))(
       "SAT12 stale unverified TOTP factor removed and verified.\n",
     );

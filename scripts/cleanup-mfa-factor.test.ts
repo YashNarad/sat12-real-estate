@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   buildMfaCleanupConfiguration,
+  createMfaCleanupOperator,
   createMfaCleanupRoleReader,
   runMfaFactorCleanup,
 } from "./cleanup-mfa-factor.mjs";
@@ -145,8 +146,72 @@ describe("guarded stale MFA cleanup", () => {
     expect(env.SAT12_REMOTE_OPERATION_APPROVED).toBeUndefined();
   });
 
+  it("accepts the installed SDK nested delete response contract", async () => {
+    const deleteFactor = vi.fn(async () => ({
+      data: { data: { id: FACTOR_ID }, error: null },
+      error: null,
+    }));
+    const client = { auth: { admin: { mfa: { deleteFactor } } } };
+    const adapter = createMfaCleanupOperator(client, { getRoleState: vi.fn() });
+
+    await expect(adapter.deleteFactor(USER_ID, FACTOR_ID)).resolves.toEqual({ acknowledged: true });
+    expect(deleteFactor).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["explicit API error", { data: null, error: new Error("provider refused") }],
+    ["transport failure", new Error("connection ended")],
+  ])("sanitizes %s without retrying", async (_label, response) => {
+    const deleteFactor = vi.fn(async () => {
+      if (response instanceof Error) throw response;
+      return response;
+    });
+    const client = { auth: { admin: { mfa: { deleteFactor } } } };
+    const adapter = createMfaCleanupOperator(client, { getRoleState: vi.fn() });
+
+    await expect(adapter.deleteFactor(USER_ID, FACTOR_ID)).rejects.toThrow("SAT12_MFA_CLEANUP_DELETE_FAILED");
+    expect(deleteFactor).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a malformed success response as unacknowledged pending verification", async () => {
+    const client = {
+      auth: { admin: { mfa: { deleteFactor: vi.fn(async () => ({ data: {}, error: null })) } } },
+    };
+    const adapter = createMfaCleanupOperator(client, { getRoleState: vi.fn() });
+
+    await expect(adapter.deleteFactor(USER_ID, FACTOR_ID)).resolves.toEqual({ acknowledged: false });
+  });
+
+  it("confirms deletion through factor listing after a transport failure", async () => {
+    const activeOperator = operator({
+      deleteFactor: vi.fn(async () => { throw new Error("SAT12_MFA_CLEANUP_DELETE_FAILED"); }),
+    });
+    const { result, messages } = execute({ operator: activeOperator });
+
+    await expect(result).resolves.toBeUndefined();
+    expect(activeOperator.deleteFactor).toHaveBeenCalledTimes(1);
+    expect(activeOperator.listFactors).toHaveBeenCalledTimes(2);
+    expect(messages).toEqual(["SAT12 stale unverified TOTP factor removed and verified.\n"]);
+  });
+
+  it("reports an uncertain outcome when post-deletion verification cannot complete", async () => {
+    const activeOperator = operator({
+      listFactors: vi.fn()
+        .mockResolvedValueOnce([factor()])
+        .mockRejectedValueOnce(new Error("provider unavailable")),
+    });
+    const { result, env } = execute({ operator: activeOperator });
+
+    await expect(result).rejects.toThrow("SAT12_MFA_CLEANUP_OUTCOME_UNCERTAIN");
+    expect(activeOperator.deleteFactor).toHaveBeenCalledTimes(1);
+    expect(env.SAT12_REMOTE_OPERATION_APPROVED).toBeUndefined();
+  });
+
   it("fails closed when deletion fails and never retries", async () => {
-    const activeOperator = operator({ deleteFactor: vi.fn(async () => { throw new Error("provider detail selected@example.test"); }) });
+    const activeOperator = operator({
+      deleteFactor: vi.fn(async () => { throw new Error("provider detail selected@example.test"); }),
+      listFactors: vi.fn().mockResolvedValueOnce([factor()]).mockResolvedValueOnce([factor()]),
+    });
     const { result, env } = execute({ operator: activeOperator });
     await expect(result).rejects.toThrow("SAT12_MFA_CLEANUP_DELETE_FAILED");
     expect(activeOperator.deleteFactor).toHaveBeenCalledTimes(1);
@@ -155,7 +220,7 @@ describe("guarded stale MFA cleanup", () => {
 
   it("fails when post-deletion factors or authorization state differ", async () => {
     const stillPresent = operator({ listFactors: vi.fn().mockResolvedValueOnce([factor()]).mockResolvedValueOnce([factor()]) });
-    await expect(execute({ operator: stillPresent }).result).rejects.toThrow("SAT12_MFA_CLEANUP_POSTCHECK_FAILED");
+    await expect(execute({ operator: stillPresent }).result).rejects.toThrow("SAT12_MFA_CLEANUP_DELETE_FAILED");
     const roleChanged = operator({
       getRoleState: vi.fn().mockResolvedValueOnce({ role: "user", adminCount: 0 }).mockResolvedValueOnce({ role: "admin", adminCount: 1 }),
     });
