@@ -5,7 +5,10 @@ export const instant = false;
 
 export default async function OwnerPropertiesPage() {
   const client = await createServerClient();
-  const { data, error } = await client.from("properties").select("id, slug, archived_at, published_revision_id, property_revisions(id, title, status, revision_number, rejection_reason, updated_at)").order("updated_at", { ascending: false });
+  // property_revisions is disambiguated via FK hint: properties has two FK relationships
+  // to property_revisions (one-to-many via property_id, and the published_revision_id FK).
+  // Without the hint PostgREST returns PGRST201 (HTTP 300 Multiple Choices).
+  const { data, error } = await client.from("properties").select("id, slug, archived_at, published_revision_id, property_revisions!property_revisions_property_id_fkey(id, title, status, revision_number, rejection_reason, updated_at)").order("updated_at", { ascending: false });
   if (error) return <DashboardMessage title="Properties unavailable" message="We could not load your properties. Please try again." />;
   return <main className="mx-auto max-w-7xl px-5 py-10"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-semibold text-[var(--sat-red)]">OWNER DASHBOARD</p><h1 className="mt-1 text-3xl font-bold">My properties</h1></div><Link className="rounded-lg bg-[var(--sat-red)] px-5 py-3 font-semibold text-white" href="/dashboard/properties/new">Add property</Link></div>
     {!data?.length ? <div className="mt-8"><DashboardMessage title="No properties yet" message="Create your first private draft to get started." /></div> : <div className="mt-8 grid gap-4">{data.map((property) => {
