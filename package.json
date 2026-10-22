@@ -18,6 +18,7 @@
     "supabase:storage-fixtures": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/seed-property-images.mjs",
     "supabase:types:check": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/check-database-types.mjs",
     "supabase:bootstrap-admin": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/bootstrap-admin.mjs",
+    "supabase:cleanup-mfa-factor": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.supabase.local scripts/cleanup-mfa-factor.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

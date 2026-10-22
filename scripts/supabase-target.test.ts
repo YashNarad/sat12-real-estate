@@ -100,6 +100,20 @@ describe("validateSupabaseTarget", () => {
       }),
     ).toEqual({ operation: "storage-api-test", projectRef });
   });
+
+  it("requires project-bound approval for stale MFA factor cleanup", () => {
+    expect(() =>
+      validateSupabaseTarget({ ...validInput, operation: "mfa-factor-cleanup" }),
+    ).toThrow(/mfa-factor-cleanup/);
+
+    expect(
+      validateSupabaseTarget({
+        ...validInput,
+        operation: "mfa-factor-cleanup",
+        operationApproval: `mfa-factor-cleanup:${projectRef}`,
+      }),
+    ).toEqual({ operation: "mfa-factor-cleanup", projectRef });
+  });
 });
 
 describe("validateDatabaseUrl", () => {

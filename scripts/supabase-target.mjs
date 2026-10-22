@@ -11,6 +11,7 @@ const APPROVAL_REQUIRED_OPERATIONS = new Set([
   "storage-fixture-apply",
   "storage-fixture-cleanup",
   "storage-api-test",
+  "mfa-factor-cleanup",
 ]);
 const ALLOWED_OPERATIONS = new Set(["read", ...APPROVAL_REQUIRED_OPERATIONS]);
 
