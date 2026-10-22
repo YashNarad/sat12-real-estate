@@ -1,8 +1,17 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { Client } from "pg";
 import { createClient } from "@supabase/supabase-js";
 
-import { validateTargetFromEnvironment } from "./supabase-target.mjs";
+import { buildVerifiedTlsConfig } from "./cloud-db-test-runner.mjs";
+import {
+  validateDatabaseUrl,
+  validateTargetFromEnvironment,
+} from "./supabase-target.mjs";
+
+const SUPABASE_ROOT_CA_PATH = path.resolve("certificates/supabase-root-2021-ca.crt");
 
 function required(name, value) {
   if (!value?.trim()) throw new Error(`SAT12_MFA_CLEANUP_CONFIGURATION_INVALID: ${name}`);
@@ -11,10 +20,14 @@ function required(name, value) {
 
 export function buildMfaCleanupConfiguration(env = process.env) {
   const { projectRef } = validateTargetFromEnvironment("mfa-factor-cleanup", env);
+  const databaseUrl = required("SUPABASE_DB_URL", env.SUPABASE_DB_URL);
+  validateDatabaseUrl(databaseUrl, projectRef);
   return {
     projectRef,
     projectUrl: required("NEXT_PUBLIC_SUPABASE_URL", env.NEXT_PUBLIC_SUPABASE_URL),
     serviceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY", env.SUPABASE_SERVICE_ROLE_KEY),
+    databaseUrl,
+    certificatePath: env.SUPABASE_SSL_ROOT_CERT || SUPABASE_ROOT_CA_PATH,
     email: required("SAT12_MFA_CLEANUP_EMAIL", env.SAT12_MFA_CLEANUP_EMAIL).toLowerCase(),
   };
 }
@@ -29,19 +42,51 @@ async function listAllUsers(client) {
   }
 }
 
-export function createMfaCleanupOperator(client) {
+export function createMfaCleanupRoleReader(database) {
   return {
-    listUsers: () => listAllUsers(client),
     async getRoleState(userId) {
-      const [profileResult, adminResult] = await Promise.all([
-        client.from("profiles").select("role").eq("id", userId).maybeSingle(),
-        client.from("profiles").select("id", { count: "exact", head: true }).eq("role", "admin"),
-      ]);
-      if (profileResult.error || !profileResult.data || adminResult.error || adminResult.count === null) {
+      try {
+        await database.query("begin read only");
+        const result = await database.query(
+          `select
+             (select role::text from public.profiles where id = $1) as role,
+             (select count(*)::int from public.profiles where role = 'admin') as admin_count`,
+          [userId],
+        );
+        const state = result.rows?.[0];
+        if (result.rowCount !== 1
+          || typeof state?.role !== "string"
+          || !Number.isInteger(state?.admin_count)
+          || state.admin_count < 0) {
+          throw new Error("SAT12_MFA_CLEANUP_ROLE_LOOKUP_FAILED");
+        }
+        await database.query("commit");
+        return { role: state.role, adminCount: state.admin_count };
+      } catch {
+        await database.query("rollback").catch(() => {});
         throw new Error("SAT12_MFA_CLEANUP_ROLE_LOOKUP_FAILED");
       }
-      return { role: profileResult.data.role, adminCount: adminResult.count };
     },
+  };
+}
+
+async function openMfaCleanupRoleReader(configuration) {
+  const certificate = await readFile(configuration.certificatePath, "utf8");
+  const database = new Client({
+    connectionString: configuration.databaseUrl,
+    ssl: buildVerifiedTlsConfig(certificate),
+  });
+  await database.connect();
+  return {
+    ...createMfaCleanupRoleReader(database),
+    close: () => database.end(),
+  };
+}
+
+export function createMfaCleanupOperator(client, roleReader) {
+  return {
+    listUsers: () => listAllUsers(client),
+    getRoleState: (userId) => roleReader.getRoleState(userId),
     async listFactors(userId) {
       const { data, error } = await client.auth.admin.mfa.listFactors({ userId });
       if (error || !data?.factors) throw new Error("SAT12_MFA_CLEANUP_FACTOR_LOOKUP_FAILED");
@@ -77,6 +122,7 @@ function resolveOnlyStaleTotp(factors) {
 }
 
 export async function runMfaFactorCleanup(env = process.env, options = {}) {
+  let roleReader;
   try {
     const configuration = buildMfaCleanupConfiguration(env);
     const client = options.operator
@@ -84,7 +130,8 @@ export async function runMfaFactorCleanup(env = process.env, options = {}) {
       : createClient(configuration.projectUrl, configuration.serviceRoleKey, {
         auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
       });
-    const operator = options.operator ?? createMfaCleanupOperator(client);
+    roleReader = options.operator ? null : await openMfaCleanupRoleReader(configuration);
+    const operator = options.operator ?? createMfaCleanupOperator(client, roleReader);
     const target = resolveTargetUser(await operator.listUsers(), configuration.email);
     assertRoleState(await operator.getRoleState(target.id));
     const candidate = resolveOnlyStaleTotp(await operator.listFactors(target.id));
@@ -108,7 +155,11 @@ export async function runMfaFactorCleanup(env = process.env, options = {}) {
       "SAT12 stale unverified TOTP factor removed and verified.\n",
     );
   } finally {
-    delete env.SAT12_REMOTE_OPERATION_APPROVED;
+    try {
+      await roleReader?.close();
+    } finally {
+      delete env.SAT12_REMOTE_OPERATION_APPROVED;
+    }
   }
 }
 

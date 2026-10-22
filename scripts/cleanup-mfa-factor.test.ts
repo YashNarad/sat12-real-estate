@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { buildMfaCleanupConfiguration, runMfaFactorCleanup } from "./cleanup-mfa-factor.mjs";
+import {
+  buildMfaCleanupConfiguration,
+  createMfaCleanupRoleReader,
+  runMfaFactorCleanup,
+} from "./cleanup-mfa-factor.mjs";
 
 const PROJECT_REF = "abcdefghijklmnopqrst";
 const USER_ID = "10000000-0000-4000-8000-000000000001";
@@ -15,6 +19,7 @@ function environment(overrides: Record<string, string> = {}): NodeJS.ProcessEnv 
     SAT12_DEVELOPMENT_DATA_CONFIRMED: "true",
     SAT12_REMOTE_OPERATION_APPROVED: `mfa-factor-cleanup:${PROJECT_REF}`,
     SUPABASE_SERVICE_ROLE_KEY: "test-service-role-placeholder",
+    SUPABASE_DB_URL: `postgresql://postgres.${PROJECT_REF}@aws-0-ap-south-1.pooler.supabase.com:5432/postgres`,
     SAT12_MFA_CLEANUP_EMAIL: "selected@example.test",
     ...overrides,
   };
@@ -52,10 +57,48 @@ describe("guarded stale MFA cleanup", () => {
       projectRef: PROJECT_REF,
       projectUrl: `https://${PROJECT_REF}.supabase.co`,
       serviceRoleKey: "test-service-role-placeholder",
+      databaseUrl: `postgresql://postgres.${PROJECT_REF}@aws-0-ap-south-1.pooler.supabase.com:5432/postgres`,
+      certificatePath: expect.stringMatching(/supabase-root-2021-ca\.crt$/u),
       email: "selected@example.test",
     });
     expect(() => buildMfaCleanupConfiguration(environment({ SAT12_REMOTE_OPERATION_APPROVED: "" }))).toThrow(/mfa-factor-cleanup/);
     expect(() => buildMfaCleanupConfiguration(environment({ SAT12_APPROVED_PROJECT_REF: "wrongwrongwrongwrongwr" }))).toThrow(/approved/i);
+  });
+
+  it("reads authoritative role state through a read-only database transaction", async () => {
+    const database = {
+      query: vi.fn()
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ rows: [{ role: "user", admin_count: 0 }], rowCount: 1 })
+        .mockResolvedValueOnce({}),
+    };
+    const reader = createMfaCleanupRoleReader(database);
+
+    await expect(reader.getRoleState(USER_ID)).resolves.toEqual({ role: "user", adminCount: 0 });
+    expect(database.query).toHaveBeenNthCalledWith(1, "begin read only");
+    expect(database.query).toHaveBeenNthCalledWith(2, expect.stringContaining("public.profiles"), [USER_ID]);
+    expect(database.query).toHaveBeenNthCalledWith(3, "commit");
+  });
+
+  it.each([
+    ["query failure", new Error("permission denied")],
+    ["missing profile", { rows: [{ role: null, admin_count: 0 }], rowCount: 1 }],
+    ["malformed count", { rows: [{ role: "user", admin_count: null }], rowCount: 1 }],
+    ["unexpected response", { rows: [], rowCount: 0 }],
+  ])("fails closed on %s and rolls back", async (_label, response) => {
+    const database = {
+      query: vi.fn()
+        .mockResolvedValueOnce({})
+        .mockImplementationOnce(async () => {
+          if (response instanceof Error) throw response;
+          return response;
+        })
+        .mockResolvedValueOnce({}),
+    };
+    const reader = createMfaCleanupRoleReader(database);
+
+    await expect(reader.getRoleState(USER_ID)).rejects.toThrow("SAT12_MFA_CLEANUP_ROLE_LOOKUP_FAILED");
+    expect(database.query).toHaveBeenLastCalledWith("rollback");
   });
 
   it.each([
