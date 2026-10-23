@@ -187,6 +187,61 @@ export type Database = {
           },
         ]
       }
+      listing_badge_audit_log: {
+        Row: {
+          actor_id: string
+          created_at: string
+          id: string
+          new_badge: string | null
+          previous_badge: string | null
+          property_id: string
+          reason: string
+          revision_id: string
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          id?: string
+          new_badge?: string | null
+          previous_badge?: string | null
+          property_id: string
+          reason: string
+          revision_id: string
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          id?: string
+          new_badge?: string | null
+          previous_badge?: string | null
+          property_id?: string
+          reason?: string
+          revision_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_badge_audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_badge_audit_log_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_badge_audit_log_revision_id_property_id_fkey"
+            columns: ["revision_id", "property_id"]
+            isOneToOne: false
+            referencedRelation: "property_revisions"
+            referencedColumns: ["id", "property_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           agency_name: string | null
@@ -772,6 +827,50 @@ export type Database = {
       }
       reject_listing: {
         Args: { p_notes: string; p_revision_id: string }
+        Returns: {
+          approved_at: string | null
+          area_sq_ft: number
+          badge: string | null
+          bathrooms: number
+          bedrooms: number
+          city: string
+          construction_status: Database["public"]["Enums"]["construction_status"]
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          latitude: number
+          listing_intent: Database["public"]["Enums"]["listing_intent"]
+          locality: string
+          location: unknown
+          longitude: number
+          postal_code: string | null
+          price_inr: number
+          property_id: string
+          property_type: Database["public"]["Enums"]["property_type"]
+          published_at: string | null
+          rejection_reason: string | null
+          replaces_revision_id: string | null
+          rera_approved: boolean
+          rera_number: string | null
+          retention_not_before: string | null
+          retention_notice_sent_at: string | null
+          revision_number: number
+          state: string
+          status: Database["public"]["Enums"]["revision_status"]
+          submitted_at: string | null
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "property_revisions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_listing_badge: {
+        Args: { p_badge: string; p_reason: string; p_revision_id: string }
         Returns: {
           approved_at: string | null
           area_sq_ft: number
