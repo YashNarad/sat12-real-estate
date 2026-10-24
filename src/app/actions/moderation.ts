@@ -32,11 +32,6 @@ export type AdminRoleActionState = {
   fieldErrors?: Partial<Record<"targetProfileId" | "reason", string[]>>;
 };
 
-export const initialAdminRoleActionState: AdminRoleActionState = {
-  ok: false,
-  message: "",
-};
-
 function authorizationFailure(error: AuthorizationError): AdminRoleActionState {
   if (error.code === "AUTH_REQUIRED") {
     return { ok: false, code: "AUTH_REQUIRED", message: "Sign in to continue." };

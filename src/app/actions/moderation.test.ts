@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 import { AuthorizationError } from "@/features/auth/authorization";
 
@@ -121,5 +123,13 @@ describe("owner/agent approval action", () => {
     const result = await approveOwnerAgent({ ok: false, message: "" }, form());
     expect(result).toEqual({ ok: false, code: "FORBIDDEN", message: "The role change was not authorized." });
     expect(JSON.stringify(result)).not.toContain("private database detail");
+  });
+
+  it("keeps every module-level export in the use-server file callable", async () => {
+    const source = await readFile(
+      path.join(process.cwd(), "src/app/actions/moderation.ts"),
+      "utf8",
+    );
+    expect(source).not.toMatch(/export\s+const\s+(?!approveOwnerAgent)/);
   });
 });

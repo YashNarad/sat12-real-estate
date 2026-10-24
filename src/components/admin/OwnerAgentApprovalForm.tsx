@@ -4,8 +4,13 @@ import { useActionState } from "react";
 
 import {
   approveOwnerAgent,
-  initialAdminRoleActionState,
+  type AdminRoleActionState,
 } from "@/app/actions/moderation";
+
+const initialAdminRoleActionState: AdminRoleActionState = {
+  ok: false,
+  message: "",
+};
 
 export function OwnerAgentApprovalForm({
   profile,
@@ -64,10 +69,10 @@ export function OwnerAgentApprovalForm({
       ) : null}
       <button
         className="mt-4 rounded-lg bg-[var(--sat-red)] px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={pending}
+        disabled={pending || state.ok}
         type="submit"
       >
-        {pending ? "Approving…" : "Approve owner/agent"}
+        {pending ? "Approving…" : state.ok ? "Approved" : "Approve owner/agent"}
       </button>
     </form>
   );
