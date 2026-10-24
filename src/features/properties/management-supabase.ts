@@ -11,7 +11,7 @@ export async function createManagementClient() {
     },
     getRevision: async (id: string) => {
       const result = await supabase.from("property_revisions")
-        .select("id, property_id, status, updated_at, properties!inner(owner_id, published_revision_id)")
+        .select("id, property_id, status, updated_at, properties!property_revisions_property_id_fkey!inner(owner_id, published_revision_id)")
         .eq("id", id).maybeSingle();
       return result as unknown as { data: Record<string, unknown> | null; error: { code?: string } | null };
     },
