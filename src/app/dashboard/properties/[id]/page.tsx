@@ -10,7 +10,7 @@ import type { ManagedRevision } from "@/types/managed-property";
 export default async function PropertyRevisionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const client = await createServerClient();
-  const { data } = await client.from("property_revisions").select("id, property_id, revision_number, title, description, listing_intent, property_type, price_inr, locality, city, state, postal_code, latitude, longitude, bedrooms, bathrooms, area_sq_ft, construction_status, rera_approved, rera_number, status, rejection_reason, updated_at, properties!inner(id, published_revision_id), property_images(id, storage_path, alt_text, position)").eq("id", id).maybeSingle();
+  const { data } = await client.from("property_revisions").select("id, property_id, revision_number, title, description, listing_intent, property_type, price_inr, locality, city, state, postal_code, latitude, longitude, bedrooms, bathrooms, area_sq_ft, construction_status, rera_approved, rera_number, status, rejection_reason, updated_at, properties!property_revisions_property_id_fkey!inner(id, published_revision_id), property_images(id, storage_path, alt_text, position)").eq("id", id).maybeSingle();
   if (!data) notFound();
   const revision = data as unknown as ManagedRevision & { property_images: { id: string; storage_path: string; alt_text: string; position: number }[] };
   const editable = revision.status === "draft" || revision.status === "rejected";

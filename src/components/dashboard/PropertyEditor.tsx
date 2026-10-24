@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import type { ActionState, ManagedRevision } from "@/types/managed-property";
 import { SubmissionStatus } from "./SubmissionStatus";
@@ -10,6 +11,15 @@ type EditorAction = (state: ActionState, data: FormData) => Promise<ActionState>
 export function PropertyEditor({ action, revision }: { action: EditorAction; revision?: ManagedRevision }) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const error = (field: string) => state.ok ? undefined : state.fieldErrors?.[field]?.[0];
+  const createdRevisionId =
+    !revision &&
+    state.ok &&
+    state.data &&
+    typeof state.data === "object" &&
+    "id" in state.data &&
+    typeof state.data.id === "string"
+      ? state.data.id
+      : null;
   return <form action={formAction} className="grid gap-5" noValidate>
     {revision ? <input name="updatedAt" type="hidden" value={revision.updated_at} /> : null}
     <div><label className="text-sm font-semibold" htmlFor="title">Listing title</label><input className="mt-2 h-12 w-full rounded-lg border border-[var(--sat-border)] px-4" defaultValue={revision?.title} id="title" name="title" required /><p className="text-sm text-red-700">{error("title")}</p></div>
@@ -31,7 +41,8 @@ export function PropertyEditor({ action, revision }: { action: EditorAction; rev
     <label className="flex items-center gap-3 text-sm"><input defaultChecked={revision?.rera_approved} name="reraApproved" type="checkbox" /> RERA approved</label>
     <input name="city" type="hidden" value="Nagpur" /><input name="state" type="hidden" value="Maharashtra" />
     <SubmissionStatus message={state.message} ok={state.ok} />
-    <button className="h-12 rounded-lg bg-[var(--sat-red)] px-6 font-semibold text-white disabled:opacity-60 sm:w-fit" disabled={pending} type="submit">{pending ? "Saving…" : revision ? "Save draft" : "Create draft"}</button>
+    {createdRevisionId ? <Link className="w-fit rounded-lg border border-[var(--sat-red)] px-5 py-3 font-semibold text-[var(--sat-red)]" href={`/dashboard/properties/${createdRevisionId}`}>Edit draft and add photos</Link> : null}
+    <button className="h-12 rounded-lg bg-[var(--sat-red)] px-6 font-semibold text-white disabled:opacity-60 sm:w-fit" disabled={pending || Boolean(createdRevisionId)} type="submit">{pending ? "Saving…" : createdRevisionId ? "Draft created" : revision ? "Save draft" : "Create draft"}</button>
   </form>;
 }
 
