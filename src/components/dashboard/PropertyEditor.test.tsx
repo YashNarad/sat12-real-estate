@@ -51,4 +51,11 @@ describe("PropertyEditor", () => {
     );
     expect(screen.getByRole("button", { name: "Draft created" })).toBeDisabled();
   });
+
+  it("associates clear field errors with invalid controls", () => {
+    harness.state = { ok: false, code: "VALIDATION", message: "Check the highlighted fields.", fieldErrors: { title: ["Enter at least 5 characters."] } };
+    render(<PropertyEditor action={vi.fn()} />);
+    expect(screen.getByLabelText("Listing title")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Listing title")).toHaveAccessibleDescription("Enter at least 5 characters.");
+  });
 });

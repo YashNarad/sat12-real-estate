@@ -17,10 +17,11 @@ export default async function PropertyRevisionPage({ params }: { params: Promise
   const update = updateDraft.bind(null, revision.id);
   async function submit() { "use server"; return submitListing(revision.id); }
   async function clone() { "use server"; return createRevision(revision.property_id); }
+  const editorFormId = "property-draft-editor";
   return <main className="mx-auto max-w-5xl px-5 py-10"><Link className="text-sm font-semibold text-[var(--sat-red)]" href="/dashboard/properties">← My properties</Link><div className="mt-5 grid gap-6">
-    <section className="rounded-2xl border border-[var(--sat-border)] bg-white p-6 sm:p-8"><div className="mb-7 flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-bold">{revision.title}</h1><p className="mt-1 text-sm text-zinc-500">Revision {revision.revision_number} · <span className="capitalize">{revision.status}</span></p></div>{editable ? <LifecycleAction action={submit} label="Submit for review" pendingLabel="Submitting…" /> : null}</div>
+    <section className="rounded-2xl border border-[var(--sat-border)] bg-white p-6 sm:p-8"><div className="mb-7 flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-bold">{revision.title}</h1><p className="mt-1 text-sm text-zinc-500">Revision {revision.revision_number} · <span className="capitalize">{revision.status}</span></p></div>{editable ? <LifecycleAction action={submit} label="Submit for review" pendingLabel="Submitting…" trackedFormId={editorFormId} /> : null}</div>
       {revision.rejection_reason ? <p className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-800">Reviewer note: {revision.rejection_reason}</p> : null}
-      {editable ? <PropertyEditor action={update} revision={revision} /> : <p className="rounded-lg bg-zinc-50 p-4 text-sm text-zinc-600">This revision is locked while it is {revision.status}. Published edits must start as a new private revision.</p>}
+      {editable ? <PropertyEditor action={update} formId={editorFormId} revision={revision} /> : <p className="rounded-lg bg-zinc-50 p-4 text-sm text-zinc-600">This revision is locked while it is {revision.status}. Published edits must start as a new private revision.</p>}
       {revision.status === "published" ? <div className="mt-5"><LifecycleAction action={clone} label="Create private revision" pendingLabel="Creating…" /></div> : null}
     </section>
     <section className="rounded-2xl border border-[var(--sat-border)] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold">Property images</h2>

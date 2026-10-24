@@ -17,7 +17,7 @@ function authFailure(error: unknown): ActionState {
 
 async function context() {
   const client = await createManagementClient();
-  const principal = await requireRole(["owner_agent", "admin"], { client: client.raw });
+  const principal = await requireRole(["owner_agent"], { client: client.raw });
   return { client, principal, service: createPropertyManagementService(client, { id: principal.id, role: principal.role as "owner_agent" | "admin" }) };
 }
 
@@ -54,7 +54,7 @@ export async function deleteDraft(revisionId: string): Promise<ActionState> {
 }
 
 export async function submitListing(revisionId: string): Promise<ActionState> {
-  try { const { service } = await context(); const result = await service.submitListing(revisionId); if (result.ok) revalidatePath("/dashboard/properties"); return result; }
+  try { const { service } = await context(); const result = await service.submitListing(revisionId); if (result.ok) { revalidatePath("/dashboard/properties"); revalidatePath(`/dashboard/properties/${revisionId}`); } return result; }
   catch (error) { return authFailure(error); }
 }
 

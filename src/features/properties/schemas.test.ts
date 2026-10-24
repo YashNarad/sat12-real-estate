@@ -17,6 +17,10 @@ describe("property draft validation", () => {
     expect(parsed).toMatchObject({ title: "3 BHK Apartment", locality: "Dharampeth" });
   });
 
+  it("accepts Supabase timestamps with an explicit UTC offset", () => {
+    expect(propertyDraftSchema.safeParse({ ...valid, updatedAt: "2026-10-25T10:30:00+00:00" }).success).toBe(true);
+  });
+
   it.each([
     [{ priceInr: 0 }, "priceInr"], [{ areaSqFt: -1 }, "areaSqFt"],
     [{ latitude: 19 }, "latitude"], [{ longitude: 82 }, "longitude"],
@@ -26,6 +30,19 @@ describe("property draft validation", () => {
     const result = propertyDraftSchema.safeParse({ ...valid, ...change });
     expect(result.success).toBe(false);
     if (!result.success) expect((result.error.flatten().fieldErrors as Record<string, string[] | undefined>)[field]).toBeDefined();
+  });
+
+  it.each([
+    [{ title: "Tiny".slice(0, 4) }, "title", "at least 5"],
+    [{ description: "Too short" }, "description", "at least 10"],
+    [{ priceInr: 0 }, "priceInr", "greater than zero"],
+    [{ areaSqFt: 0 }, "areaSqFt", "greater than zero"],
+    [{ postalCode: "123456" }, "postalCode", "Nagpur PIN"],
+    [{ reraApproved: true, reraNumber: "" }, "reraNumber", "RERA number"],
+  ])("returns a useful message for %s", (change, field, message) => {
+    const result = propertyDraftSchema.safeParse({ ...valid, ...change });
+    expect(result.success).toBe(false);
+    if (!result.success) expect((result.error.flatten().fieldErrors as Record<string, string[] | undefined>)[field]?.[0]).toContain(message);
   });
 });
 

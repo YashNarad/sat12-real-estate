@@ -1,23 +1,25 @@
 import { z } from "zod";
 
-const trimmed = (min: number, max: number) => z.string().trim().min(min).max(max);
+const trimmed = (min: number, max: number, label = "Value") => z.string().trim()
+  .min(min, `${label} must be at least ${min} characters.`)
+  .max(max, `${label} must be at most ${max} characters.`);
 const nagpurLatitude = z.coerce.number().min(20.8).max(21.5);
 const nagpurLongitude = z.coerce.number().min(78.7).max(79.5);
 
 export const propertyDraftSchema = z.object({
-  title: trimmed(5, 120),
-  description: z.string().trim().max(5000),
+  title: trimmed(5, 120, "Title"),
+  description: trimmed(10, 5000, "Description"),
   listingIntent: z.enum(["buy", "rent"]),
   propertyType: z.enum(["apartment", "villa", "independent_house", "plot"]),
-  priceInr: z.coerce.number().int().positive().max(10_000_000_000),
+  priceInr: z.coerce.number().int().positive("Price must be greater than zero.").max(10_000_000_000),
   locality: trimmed(2, 100), city: z.literal("Nagpur"), state: z.literal("Maharashtra"),
-  postalCode: z.string().trim().regex(/^44\d{4}$/).or(z.literal("")),
+  postalCode: z.string().trim().regex(/^44\d{4}$/, "Enter a valid Nagpur PIN code beginning with 44.").or(z.literal("")),
   latitude: nagpurLatitude, longitude: nagpurLongitude,
   bedrooms: z.coerce.number().int().min(0).max(20), bathrooms: z.coerce.number().int().min(0).max(20),
-  areaSqFt: z.coerce.number().int().positive().max(1_000_000),
+  areaSqFt: z.coerce.number().int().positive("Area must be greater than zero.").max(1_000_000),
   constructionStatus: z.enum(["ready_to_move", "under_construction"]),
   reraApproved: z.boolean(), reraNumber: z.string().trim().max(80),
-  updatedAt: z.string().datetime().optional(),
+  updatedAt: z.string().datetime({ offset: true }).optional(),
 }).superRefine((value, context) => {
   if (value.propertyType === "plot" && value.bedrooms !== 0)
     context.addIssue({ code: "custom", path: ["bedrooms"], message: "Plots cannot have bedrooms." });

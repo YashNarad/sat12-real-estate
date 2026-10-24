@@ -63,6 +63,12 @@ describe("owner property management service", () => {
       .resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
   });
 
+  it("explains incomplete submission requirements without exposing database details", async () => {
+    const db = client({ rpc: vi.fn(async () => ({ data: null, error: { code: "23514", message: "SAT12_LISTING_INCOMPLETE" } })) });
+    await expect(createPropertyManagementService(db, principal).submitListing("revision-1"))
+      .resolves.toEqual({ ok: false, code: "VALIDATION", message: "Add a description of at least 10 characters and at least one image before submitting." });
+  });
+
   it("fails closed instead of orphaning a stable property when deleting revision one", async () => {
     const db = client();
     const result = await createPropertyManagementService(db, principal).deleteDraft("revision-1");

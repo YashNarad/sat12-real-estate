@@ -20,6 +20,7 @@ function failure(error: unknown): ActionState {
   const message = typeof error === "object" && error && "message" in error ? String(error.message) : "";
   if (code === "42501") return { ok: false, code: "FORBIDDEN", message: "You do not have permission to make that change." };
   if (code === "NOT_FOUND") return { ok: false, code: "NOT_FOUND", message: "The listing could not be found." };
+  if (code === "23514" || message.includes("SAT12_LISTING_INCOMPLETE")) return { ok: false, code: "VALIDATION", message: "Add a description of at least 10 characters and at least one image before submitting." };
   if (code === "23505" || code === "SAT12_STALE_REVISION_STATE" || message.includes("SAT12_STALE_REVISION_STATE")) return { ok: false, code: "CONFLICT", message: "This listing changed. Refresh and try again." };
   return { ok: false, code: "RETRYABLE", message: "We could not save the listing. Please try again." };
 }
