@@ -34,6 +34,12 @@ it("covers the approved private Storage threat model", async () => {
     "owner deletes editable image metadata",
     "legally held metadata deletion is denied",
     "anonymous reads only current published image",
+    "anonymous reads only current published image metadata",
+    "anonymous retains no private schema access",
+    "owner reads own draft image metadata",
+    "owner cannot read cross-property image metadata",
+    "aal1 admin cannot read private image metadata",
+    "aal2 admin reads private image metadata",
     "owner reads own revision image",
     "aal1 admin cannot read private image",
     "aal2 admin reads private image",
@@ -56,8 +62,8 @@ it("keeps unsupported Storage object mutations out of transactional pgTAP", asyn
   const assertions = source.match(
     /select\s+extensions\.(?:is|ok|lives_ok|throws_ok|results_eq)\s*\(/giu,
   );
-  expect(source).toMatch(/extensions\.plan\(28\)/u);
-  expect(assertions).toHaveLength(28);
+  expect(source).toMatch(/extensions\.plan\(34\)/u);
+  expect(assertions).toHaveLength(34);
 });
 
 it("does not invoke private helpers directly from application-role assertions", async () => {
@@ -91,5 +97,8 @@ it("tests the exact anonymous image across every non-public lifecycle state", as
   expect(source).toMatch(/storage-owner-a-archived[\s\S]*?archived_at/iu);
   expect(source).toMatch(
     /select extensions\.results_eq\([\s\S]*?select id from storage\.objects[\s\S]*?values \('44000000-0000-4000-8000-000000000003'::uuid\)[\s\S]*?'anonymous reads only current published image'/iu,
+  );
+  expect(source).toMatch(
+    /select extensions\.results_eq\([\s\S]*?select id from public\.property_images[\s\S]*?values \('44000000-0000-4000-8000-000000000003'::uuid\)[\s\S]*?'anonymous reads only current published image metadata'/iu,
   );
 });

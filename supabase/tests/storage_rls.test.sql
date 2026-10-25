@@ -1,4 +1,4 @@
-select extensions.plan(28);
+select extensions.plan(34);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
@@ -72,6 +72,46 @@ select extensions.ok(
     and exists (select 1 from public.property_images where id = '44000000-0000-4000-8000-000000000021'),
   'metadata-backed cross-owner fixture exists'
 );
+
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+set local role anon;
+select extensions.results_eq(
+  $$select id from public.property_images order by id$$,
+  $$values ('44000000-0000-4000-8000-000000000003'::uuid)$$,
+  'anonymous reads only current published image metadata'
+);
+select extensions.is(
+  has_schema_privilege('anon', 'private', 'usage'),
+  false,
+  'anonymous retains no private schema access'
+);
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"41000000-0000-4000-8000-000000000001","aal":"aal1","role":"authenticated"}', true);
+select extensions.is(
+  (select count(*) from public.property_images where id = '44000000-0000-4000-8000-000000000001'),
+  1::bigint,
+  'owner reads own draft image metadata'
+);
+select extensions.is(
+  (select count(*) from public.property_images where id = '44000000-0000-4000-8000-000000000021'),
+  0::bigint,
+  'owner cannot read cross-property image metadata'
+);
+select set_config('request.jwt.claims', '{"sub":"41000000-0000-4000-8000-000000000003","aal":"aal1","role":"authenticated"}', true);
+select extensions.is(
+  (select count(*) from public.property_images where id = '44000000-0000-4000-8000-000000000001'),
+  0::bigint,
+  'aal1 admin cannot read private image metadata'
+);
+select set_config('request.jwt.claims', '{"sub":"41000000-0000-4000-8000-000000000003","aal":"aal2","role":"authenticated"}', true);
+select extensions.is(
+  (select count(*) from public.property_images where id = '44000000-0000-4000-8000-000000000001'),
+  1::bigint,
+  'aal2 admin reads private image metadata'
+);
+reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"41000000-0000-4000-8000-000000000001","aal":"aal1","role":"authenticated"}', true);
