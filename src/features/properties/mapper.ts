@@ -62,14 +62,18 @@ const rowSchema = z.object({
 
 export const PROPERTY_IMAGE_PLACEHOLDER = "/images/properties/property-placeholder.svg";
 
-export function mapPublishedProperty(input: PublishedPropertyRow, primaryImageUrl?: string): Property {
+export function mapPublishedProperty(input: PublishedPropertyRow, signedImageUrls: readonly (string | undefined)[] = []): Property {
   const parsed = rowSchema.safeParse(input);
   if (!parsed.success) throw new Error("SAT12_PROPERTY_ROW_INVALID");
   const revision = parsed.data.published_revision;
-  const primary = [...revision.property_images].sort((a, b) => a.position - b.position)[0];
-  const image = primary && primaryImageUrl
-    ? { src: primaryImageUrl, alt: primary.alt_text, kind: primary.source_kind === "sat12_illustrative" ? "illustrative" as const : "listing" as const }
-    : { src: PROPERTY_IMAGE_PLACEHOLDER, alt: `Image unavailable for ${revision.title}`, kind: "listing" as const };
+  const orderedMetadata = [...revision.property_images].sort((a, b) => a.position - b.position);
+  const images = orderedMetadata.map((metadata, index) => {
+    const src = signedImageUrls[index];
+    return src
+      ? { src, alt: metadata.alt_text, kind: metadata.source_kind === "sat12_illustrative" ? "illustrative" as const : "listing" as const }
+      : { src: PROPERTY_IMAGE_PLACEHOLDER, alt: `Image unavailable for ${revision.title}`, kind: "listing" as const };
+  });
+  const image = images[0] ?? { src: PROPERTY_IMAGE_PLACEHOLDER, alt: `Image unavailable for ${revision.title}`, kind: "listing" as const };
 
   return {
     id: parsed.data.id,
@@ -82,6 +86,7 @@ export function mapPublishedProperty(input: PublishedPropertyRow, primaryImageUr
     latitude: revision.latitude,
     longitude: revision.longitude,
     image,
+    images,
     bedrooms: revision.bedrooms,
     bathrooms: revision.bathrooms,
     areaSqFt: revision.area_sq_ft,

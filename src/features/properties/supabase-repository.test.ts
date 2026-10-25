@@ -47,9 +47,8 @@ function clientResult(data: PublishedPropertyRow[] | null, error: unknown = null
   const not = vi.fn(() => ({ order }));
   const is = vi.fn(() => ({ not }));
   const select = vi.fn(() => ({ is }));
-  const primaryImage = data?.[0]?.published_revision?.property_images.toSorted((a, b) => a.position - b.position)[0];
-  const imageLimit = vi.fn().mockResolvedValue({ data: primaryImage ? [primaryImage] : [], error: null });
-  const imageOrder = vi.fn(() => ({ limit: imageLimit }));
+  const publishedImages = data?.[0]?.published_revision?.property_images.toSorted((a, b) => a.position - b.position) ?? [];
+  const imageOrder = vi.fn().mockResolvedValue({ data: publishedImages, error: null });
   const imageEq = vi.fn(() => ({ order: imageOrder }));
   const imageSelect = vi.fn(() => ({ eq: imageEq }));
   const createSignedUrl = vi.fn(async (path: string, expiresIn: number) => ({
@@ -58,7 +57,7 @@ function clientResult(data: PublishedPropertyRow[] | null, error: unknown = null
   }));
   return {
     client: { from: vi.fn((table: string) => table === "properties" ? { select } : { select: imageSelect }), storage: { from: vi.fn(() => ({ createSignedUrl })) } },
-    calls: { select, is, not, order, imageSelect, imageEq, imageOrder, imageLimit, createSignedUrl },
+    calls: { select, is, not, order, imageSelect, imageEq, imageOrder, createSignedUrl },
   };
 }
 
@@ -76,17 +75,17 @@ describe("Supabase property repository", () => {
     expect(harness.calls.imageSelect).toHaveBeenCalledWith(PUBLIC_PROPERTY_IMAGE_SELECT);
     expect(harness.calls.imageEq).toHaveBeenCalledWith("revision_id", publishedRow().published_revision!.id);
     expect(harness.calls.imageOrder).toHaveBeenCalledWith("position", { ascending: true });
-    expect(harness.calls.imageLimit).toHaveBeenCalledWith(1);
   });
 
-  it("signs only the primary image for ten minutes and returns newest rows first", async () => {
+  it("signs every ordered published image for ten minutes and returns newest rows first", async () => {
     const older = publishedRow({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", created_at: "2026-10-17T10:00:00.000Z" });
     const newer = publishedRow({ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", created_at: "2026-10-19T10:00:00.000Z" });
     const harness = clientResult([older, newer]);
     const result = await createSupabasePropertyRepository(harness.client, projectUrl).listPublished();
     expect(result.map(({ id }) => id)).toEqual([newer.id, older.id]);
     expect(harness.calls.createSignedUrl).toHaveBeenCalledWith("primary.webp", PROPERTY_IMAGE_SIGNED_URL_SECONDS);
-    expect(harness.calls.createSignedUrl).not.toHaveBeenCalledWith("later.webp", expect.anything());
+    expect(harness.calls.createSignedUrl).toHaveBeenCalledWith("later.webp", PROPERTY_IMAGE_SIGNED_URL_SECONDS);
+    expect(result[0].images?.map(({ alt }) => alt)).toEqual(["Primary", "Later"]);
     expect(PROPERTY_IMAGE_CACHE_SECONDS).toBeLessThanOrEqual(5 * 60);
   });
 
@@ -113,7 +112,7 @@ describe("Supabase property repository", () => {
 
   it("keeps public inventory available when image metadata access fails", async () => {
     const harness = clientResult([publishedRow()]);
-    harness.calls.imageLimit.mockResolvedValueOnce({ data: null, error: { code: "42501" } });
+    harness.calls.imageOrder.mockResolvedValueOnce({ data: null, error: { code: "42501" } });
     const [property] = await createSupabasePropertyRepository(harness.client, projectUrl).listPublished();
     expect(property.image.src).toBe("/images/properties/property-placeholder.svg");
     expect(property.title).toBe("Published home");
@@ -128,5 +127,7 @@ describe("Supabase property repository", () => {
       active,
     ]);
     expect(await createSupabasePropertyRepository(harness.client, projectUrl).listPublished()).toHaveLength(1);
+    expect(harness.calls.imageEq).toHaveBeenCalledTimes(1);
+    expect(harness.calls.imageEq).toHaveBeenCalledWith("revision_id", active.published_revision!.id);
   });
 });

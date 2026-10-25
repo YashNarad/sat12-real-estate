@@ -43,9 +43,7 @@ interface PropertyQuery {
 interface PropertyImageQuery {
   select(columns: string): {
     eq(column: "revision_id", value: string): {
-      order(column: "position", options: { ascending: true }): {
-        limit(count: 1): Promise<{ data: unknown; error: unknown }>;
-      };
+      order(column: "position", options: { ascending: true }): Promise<{ data: unknown; error: unknown }>;
     };
   };
 }
@@ -76,29 +74,27 @@ export function createSupabasePropertyRepository(
         const revision = row.published_revision!;
         const imagesQuery = client.from("property_images") as PropertyImageQuery;
         const imageResult = await imagesQuery.select(PUBLIC_PROPERTY_IMAGE_SELECT)
-          .eq("revision_id", revision.id).order("position", { ascending: true }).limit(1);
-        const primary = !imageResult.error && Array.isArray(imageResult.data)
-          ? imageResult.data[0] as PublishedPropertyImageRow | undefined
-          : undefined;
-        let signedUrl: string | undefined;
-        if (primary) {
-          const cached = signedUrlCache.get(primary.storage_path);
-          if (cached && cached.expiresAt > Date.now()) signedUrl = cached.url;
-          else {
-            try {
-              signedUrl = await createPropertyImageSignedUrl(
-                client.storage.from(PROPERTY_IMAGE_BUCKET), primary.storage_path, projectUrl,
-              );
-              signedUrlCache.set(primary.storage_path, { url: signedUrl, expiresAt: Date.now() + PROPERTY_IMAGE_CACHE_SECONDS * 1000 });
-            } catch {
-              signedUrl = undefined;
-            }
+          .eq("revision_id", revision.id).order("position", { ascending: true });
+        const images = !imageResult.error && Array.isArray(imageResult.data)
+          ? imageResult.data as PublishedPropertyImageRow[]
+          : [];
+        const signedUrls = await Promise.all(images.map(async (metadata) => {
+          const cached = signedUrlCache.get(metadata.storage_path);
+          if (cached && cached.expiresAt > Date.now()) return cached.url;
+          try {
+            const url = await createPropertyImageSignedUrl(
+              client.storage.from(PROPERTY_IMAGE_BUCKET), metadata.storage_path, projectUrl,
+            );
+            signedUrlCache.set(metadata.storage_path, { url, expiresAt: Date.now() + PROPERTY_IMAGE_CACHE_SECONDS * 1000 });
+            return url;
+          } catch {
+            return undefined;
           }
-        }
+        }));
         return mapPublishedProperty({
           ...row,
-          published_revision: { ...revision, property_images: primary ? [primary] : [] },
-        }, signedUrl);
+          published_revision: { ...revision, property_images: images },
+        }, signedUrls);
       }));
       return Object.freeze(properties);
     },

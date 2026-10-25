@@ -14,7 +14,7 @@ vi.mock("@/components/map/PropertyMap", () => ({
   PropertyMap: (props: Record<string, unknown>) => {
     mapHarness.props = props;
     const properties = props.properties as { id: string }[];
-    return <div data-testid="property-map" data-property-ids={properties.map(({ id }) => id).join(",")}><label><input checked={Boolean(props.searchAsMapMoves)} onChange={(event) => (props.onSearchAsMapMovesChange as (enabled: boolean) => void)(event.target.checked)} type="checkbox" />Search as I move the map</label><button onClick={() => (props.onBoundsChange as (bounds: object) => void)({ north: 21.16, south: 21.12, east: 79.1, west: 79.04 })}>Emit map bounds</button><button onClick={() => (props.onSelect as (id: string) => void)(properties[0]?.id)}>Select first marker</button><button onClick={() => (props.onSearchAsMapMovesChange as (enabled: boolean) => void)(false)}>Disable map search</button></div>;
+    return <div data-testid="property-map" data-property-ids={properties.map(({ id }) => id).join(",")}><label><input checked={Boolean(props.searchAsMapMoves)} onChange={(event) => (props.onSearchAsMapMovesChange as (enabled: boolean) => void)(event.target.checked)} type="checkbox" />Search as I move the map</label><button onClick={() => (props.onBoundsChange as (bounds: object) => void)({ north: 21.16, south: 21.12, east: 79.1, west: 79.04 })}>Emit map bounds</button><button onClick={() => (props.onSelect as (id: string) => void)(properties[0]?.id)}>Select first marker</button><button onClick={() => (props.onViewProperty as (id: string) => void)(properties[1]?.id)}>View second property in list</button><button onClick={() => (props.onViewProperty as (id: string) => void)("missing-property")}>View missing property in list</button><button onClick={() => (props.onSearchAsMapMovesChange as (enabled: boolean) => void)(false)}>Disable map search</button></div>;
   },
 }));
 
@@ -65,6 +65,36 @@ it("synchronizes card and marker selection", async () => {
   expect(mapHarness.props?.selectedPropertyId).toBeTruthy();
 });
 
+it("focuses and highlights the exact property requested by a map popup", async () => {
+  const user = userEvent.setup();
+  renderHome();
+  const target = screen.getAllByTestId("property-card")[1];
+  target.scrollIntoView = vi.fn();
+
+  await user.click(screen.getByRole("button", { name: "View second property in list" }));
+
+  expect(target).toHaveFocus();
+  expect(target).toHaveAttribute("data-selected", "true");
+  expect(target.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+  expect(screen.getByRole("status", { name: "Property navigation status" })).toHaveTextContent(/showing 4 bhk villa/i);
+});
+
+it("keeps map-to-card navigation working in list presentation", async () => {
+  const user = userEvent.setup();
+  renderHome();
+  await user.click(screen.getByRole("button", { name: /list view/i }));
+  await user.click(screen.getByRole("button", { name: "View second property in list" }));
+  expect(screen.getByTestId("property-list")).toHaveAttribute("data-view", "list");
+  expect(screen.getAllByTestId("property-card")[1]).toHaveFocus();
+});
+
+it("announces when a requested property is not present instead of failing silently", async () => {
+  const user = userEvent.setup();
+  renderHome();
+  await user.click(screen.getByRole("button", { name: "View missing property in list" }));
+  expect(screen.getByRole("status", { name: "Property navigation status" })).toHaveTextContent(/not visible with the current filters/i);
+});
+
 it("defers the map in mobile list view and mounts it after switching", async () => {
   mapHarness.isDesktop = false;
   const user = userEvent.setup();
@@ -72,6 +102,16 @@ it("defers the map in mobile list view and mounts it after switching", async () 
   expect(screen.queryByTestId("property-map")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Map" }));
   expect(screen.getByTestId("property-map")).toBeInTheDocument();
+});
+
+it("switches from the mobile map to the list before focusing a property", async () => {
+  mapHarness.isDesktop = false;
+  const user = userEvent.setup();
+  renderHome();
+  await user.click(screen.getByRole("button", { name: "Map" }));
+  await user.click(screen.getByRole("button", { name: "View second property in list" }));
+  expect(screen.getAllByTestId("property-card")[1]).toBeVisible();
+  expect(screen.getAllByTestId("property-card")[1]).toHaveFocus();
 });
 
 it("shows a truthful inventory state instead of mock listings when Supabase returns no rows", () => {

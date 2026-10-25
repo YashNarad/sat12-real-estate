@@ -39,7 +39,7 @@ const revision = row.published_revision!;
 
 describe("mapPublishedProperty", () => {
   it("maps every database enum and preserves stable identity and coordinate order", () => {
-    expect(mapPublishedProperty(row, "https://project.supabase.co/signed/image")).toEqual({
+    expect(mapPublishedProperty(row, ["https://project.supabase.co/signed/image"])).toEqual({
       id: row.id,
       title: "Modern Nagpur apartment",
       listingIntent: "Buy",
@@ -54,6 +54,11 @@ describe("mapPublishedProperty", () => {
         alt: "Sunlit apartment living room",
         kind: "listing",
       },
+      images: [{
+        src: "https://project.supabase.co/signed/image",
+        alt: "Sunlit apartment living room",
+        kind: "listing",
+      }],
       bedrooms: 3,
       bathrooms: 2,
       areaSqFt: 1450,
@@ -105,7 +110,17 @@ describe("mapPublishedProperty", () => {
         property_images: [{ ...revision.property_images[0], source_kind: "sat12_illustrative" }],
       },
     };
-    expect(mapPublishedProperty(illustrative, "https://project.supabase.co/signed/image").image.kind).toBe("illustrative");
+    expect(mapPublishedProperty(illustrative, ["https://project.supabase.co/signed/image"]).image.kind).toBe("illustrative");
+  });
+
+  it("maps every signed published image in position order while preserving the first as cover", () => {
+    const second = { ...revision.property_images[0], id: "44444444-4444-4444-8444-444444444444", alt_text: "Bedroom", position: 1 };
+    const property = mapPublishedProperty(
+      { ...row, published_revision: { ...revision, property_images: [second, revision.property_images[0]] } },
+      ["https://project.supabase.co/signed/primary", "https://project.supabase.co/signed/second"],
+    );
+    expect(property.images?.map(({ alt }) => alt)).toEqual(["Sunlit apartment living room", "Bedroom"]);
+    expect(property.image).toEqual(property.images?.[0]);
   });
 
   it.each([

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Header } from "@/components/layout/Header";
 import { PropertyResults } from "@/components/listings/PropertyResults";
@@ -27,6 +27,8 @@ export function PropertyExplorer({ accountControl, initialProperties, inventoryM
   const [searchAsMapMoves, setSearchAsMapMoves] = useState(false);
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
   const [mobileView, setMobileView] = useState<MobileResultsView>("list");
+  const pendingListPropertyId = useRef<string | null>(null);
+  const [navigationMessage, setNavigationMessage] = useState("");
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const filterMatchedProperties = useFilteredProperties(initialProperties, filters);
   const listingProperties = useMapBoundsFilter(filterMatchedProperties, mapBounds, searchAsMapMoves);
@@ -43,6 +45,26 @@ export function PropertyExplorer({ accountControl, initialProperties, inventoryM
     selection.selectProperty(id);
     setMobileView("map");
   }, [selection]);
+  const handleViewProperty = useCallback((id: string) => {
+    const property = listingProperties.find((candidate) => candidate.id === id);
+    if (!property) {
+      setNavigationMessage("That property is not visible with the current filters or map bounds.");
+      return;
+    }
+    selection.selectProperty(id);
+    setMobileView("list");
+    setNavigationMessage(`Showing ${property.title} in the property list.`);
+    pendingListPropertyId.current = id;
+  }, [listingProperties, selection]);
+  useEffect(() => {
+    const id = pendingListPropertyId.current;
+    if (!id) return;
+    const card = document.getElementById(`property-card-${id}`);
+    if (!card) return;
+    card.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    card.focus({ preventScroll: true });
+    pendingListPropertyId.current = null;
+  }, [mobileView, selection.selectedPropertyId]);
   const mapMounted = isDesktop || mobileView === "map";
 
   return (
@@ -59,9 +81,10 @@ export function PropertyExplorer({ accountControl, initialProperties, inventoryM
         <div className="mx-auto max-w-[1536px] px-4 pt-3 lg:hidden"><ViewToggle onChange={setMobileView} value={mobileView} /></div>
         <div className="mx-auto grid max-w-[1536px] lg:min-h-[calc(100vh-183px)] lg:grid-cols-[30%_70%]">
           <aside aria-label="Interactive property map" className={`${mobileView === "map" ? "block" : "hidden"} relative min-h-[560px] overflow-hidden border-[var(--sat-border)] lg:sticky lg:top-0 lg:block lg:h-[calc(100vh-207px)] lg:min-h-[720px] lg:rounded-l-xl lg:border lg:border-r-0`}>
-            {mapMounted && <PropertyMap onBoundsChange={handleBoundsChange} onClearSelection={selection.clearSelection} onSearchAsMapMovesChange={handleSearchAsMapMovesChange} onSelect={selection.selectProperty} onViewProperty={() => setMobileView("list")} properties={filterMatchedProperties} searchAsMapMoves={searchAsMapMoves} selectedPropertyId={selection.selectedPropertyId} visible={isDesktop || mobileView === "map"} />}
+            {mapMounted && <PropertyMap onBoundsChange={handleBoundsChange} onClearSelection={selection.clearSelection} onSearchAsMapMovesChange={handleSearchAsMapMovesChange} onSelect={selection.selectProperty} onViewProperty={handleViewProperty} properties={filterMatchedProperties} searchAsMapMoves={searchAsMapMoves} selectedPropertyId={selection.selectedPropertyId} visible={isDesktop || mobileView === "map"} />}
           </aside>
           <section className={`${mobileView === "list" ? "block" : "hidden"} results-pane min-w-0 border-[var(--sat-border)] bg-white px-4 py-6 sm:px-6 lg:block lg:rounded-r-xl lg:border lg:p-8`} id="results">
+            {navigationMessage && <p aria-label="Property navigation status" aria-live="polite" className="sr-only" role="status">{navigationMessage}</p>}
             <PropertyResults
               emptyReason={initialProperties.length === 0 ? "inventory" : searchAsMapMoves && mapBounds !== null ? "map-bounds" : "filters"}
               intent={filters.intent}

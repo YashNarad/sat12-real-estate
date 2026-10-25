@@ -19,6 +19,8 @@ export interface Property {
   latitude: number;
   longitude: number;
   image: PropertyImage;
+  /** Ordered public images for the published revision. `image` remains the cover for compatibility. */
+  images?: readonly PropertyImage[];
   bedrooms: number;
   bathrooms: number;
   areaSqFt: number;
