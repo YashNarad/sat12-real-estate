@@ -16,6 +16,7 @@ const harness = vi.hoisted(() => ({
   profileError: null as unknown,
   rpcError: null as unknown,
   rpcCalls: [] as Array<{ p_target_id: string; p_role: string; p_reason: string }>,
+  moderationRpcCalls: [] as Array<{ name: string; args: Record<string, unknown> }>,
   revalidated: [] as string[],
 }));
 
@@ -43,14 +44,15 @@ vi.mock("@/lib/supabase/server", () => ({
         }),
       }),
     }),
-    rpc: async (_name: string, args: { p_target_id: string; p_role: string; p_reason: string }) => {
-      harness.rpcCalls.push(args);
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      if (name === "set_user_role") harness.rpcCalls.push(args as { p_target_id: string; p_role: string; p_reason: string });
+      else harness.moderationRpcCalls.push({ name, args });
       return { data: null, error: harness.rpcError };
     },
   })),
 }));
 
-import { approveOwnerAgent } from "./moderation";
+import { approveOwnerAgent, moderateListing } from "./moderation";
 
 function form(target = TARGET_ID, reason = "Approved Nagpur property agent") {
   const data = new FormData();
@@ -66,6 +68,7 @@ describe("owner/agent approval action", () => {
     harness.profileError = null;
     harness.rpcError = null;
     harness.rpcCalls.length = 0;
+    harness.moderationRpcCalls.length = 0;
     harness.revalidated.length = 0;
   });
 
@@ -131,5 +134,55 @@ describe("owner/agent approval action", () => {
       "utf8",
     );
     expect(source).not.toMatch(/export\s+const\s+(?!approveOwnerAgent)/);
+  });
+});
+
+function moderationForm(intent: string, extras: Record<string, string> = {}) {
+  const data = new FormData();
+  data.set("intent", intent);
+  data.set("revisionId", TARGET_ID);
+  data.set("propertyId", "20000000-0000-4000-8000-000000000001");
+  for (const [key, value] of Object.entries(extras)) data.set(key, value);
+  return data;
+}
+
+describe("listing moderation action", () => {
+  beforeEach(() => {
+    harness.authError = null;
+    harness.rpcError = null;
+    harness.moderationRpcCalls.length = 0;
+    harness.revalidated.length = 0;
+  });
+
+  it("rejects invalid identifiers and missing required audit reasons before RPC calls", async () => {
+    const invalid = moderationForm("reject", { notes: "" });
+    invalid.set("revisionId", "invalid");
+    await expect(moderateListing({ ok: false, message: "" }, invalid)).resolves.toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(harness.moderationRpcCalls).toHaveLength(0);
+  });
+
+  it.each([
+    ["approve", {}, "approve_listing", { p_revision_id: TARGET_ID, p_notes: null }],
+    ["reject", { notes: "Missing ownership proof" }, "reject_listing", { p_revision_id: TARGET_ID, p_notes: "Missing ownership proof" }],
+    ["publish", {}, "publish_listing", { p_revision_id: TARGET_ID }],
+    ["archive", {}, "archive_listing", { p_property_id: "20000000-0000-4000-8000-000000000001" }],
+    ["badge", { badge: "featured", reason: "Homepage campaign" }, "set_listing_badge", { p_revision_id: TARGET_ID, p_badge: "featured", p_reason: "Homepage campaign" }],
+  ])("calls only the existing audited RPC for %s", async (intent, extras, name, args) => {
+    const result = await moderateListing({ ok: false, message: "" }, moderationForm(intent, extras));
+    expect(result.ok).toBe(true);
+    expect(harness.moderationRpcCalls).toEqual([{ name, args }]);
+  });
+
+  it("fails closed before RPC execution without a recent AAL2 Admin session", async () => {
+    harness.authError = new AuthorizationError("MFA_REQUIRED");
+    await expect(moderateListing({ ok: false, message: "" }, moderationForm("approve"))).resolves.toMatchObject({ ok: false, code: "MFA_REQUIRED" });
+    expect(harness.moderationRpcCalls).toHaveLength(0);
+  });
+
+  it("sanitizes stale and authorization failures", async () => {
+    harness.rpcError = { code: "P0001", message: "SAT12_STALE_REVISION_STATE private" };
+    const stale = await moderateListing({ ok: false, message: "" }, moderationForm("approve"));
+    expect(stale).toMatchObject({ ok: false, code: "CONFLICT" });
+    expect(JSON.stringify(stale)).not.toContain("private");
   });
 });

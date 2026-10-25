@@ -38,6 +38,10 @@ describe("AccountMenu", () => {
       "href",
       "/account",
     );
+    expect(screen.getByRole("link", { name: "Management Portal" })).toHaveAttribute(
+      "href",
+      "/dashboard",
+    );
     await user.click(screen.getByRole("button", { name: "Log Out" }));
     await waitFor(() => expect(logoutAction).toHaveBeenCalledOnce());
   });

@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
+import { logoutAction } from "@/app/actions/auth";
+import { ManagementPortalShell } from "@/components/management/ManagementPortalShell";
 import {
   AuthorizationError,
   requireAal2Admin,
@@ -9,8 +10,9 @@ import {
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await connection();
+  let principal;
   try {
-    await requireAal2Admin();
+    principal = await requireAal2Admin();
   } catch (error) {
     if (error instanceof AuthorizationError) {
       if (error.code === "AUTH_REQUIRED") {
@@ -24,21 +26,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     throw error;
   }
 
-  return (
-    <div className="min-h-screen bg-[var(--sat-canvas)]">
-      <header className="border-b border-[var(--sat-border)] bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-          <Link className="text-2xl font-black tracking-[-0.06em]" href="/">
-            SAT<span className="text-[var(--sat-red)]">12</span>
-          </Link>
-          <nav aria-label="Admin dashboard">
-            <Link className="font-semibold text-zinc-700" href="/admin/users">
-              Account approvals
-            </Link>
-          </nav>
-        </div>
-      </header>
-      {children}
-    </div>
-  );
+  const displayName = principal.fullName?.trim() || principal.email || "SAT12 administrator";
+  return <ManagementPortalShell account={{ aal: principal.aal, displayName, role: principal.role }} logoutAction={logoutAction}>{children}</ManagementPortalShell>;
 }

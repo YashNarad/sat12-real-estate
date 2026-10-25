@@ -81,7 +81,7 @@ describe("OwnerPropertiesPage", () => {
     };
     render(await OwnerPropertiesPage());
     expect(screen.getByRole("heading", { name: "3BHK Flat in Civil Lines" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Manage" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Edit & photos" })).toHaveAttribute(
       "href",
       "/dashboard/properties/rev-1",
     );

@@ -6,7 +6,7 @@ const harness = vi.hoisted(() => ({ calls: [] as string[] }));
 vi.mock("next/server", () => ({
   connection: vi.fn(async () => { harness.calls.push("connection"); }),
 }));
-vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("next/navigation", () => ({ redirect: vi.fn(), usePathname: () => "/account" }));
 vi.mock("@/app/actions/auth", () => ({
   enrollMfaAction: vi.fn(), logoutAction: vi.fn(), verifyMfaAction: vi.fn(),
 }));

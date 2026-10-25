@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
 import { logoutAction } from "@/app/actions/auth";
+import { ManagementPortalShell } from "@/components/management/ManagementPortalShell";
 import { AuthorizationError, requireUser } from "@/features/auth/authorization";
 
 export const instant = false;
@@ -15,8 +16,9 @@ export default async function AccountPage() {
     if (error instanceof AuthorizationError) redirect("/auth/login?next=%2Faccount");
     throw error;
   }
-  return (
-    <main className="min-h-screen bg-[var(--sat-page)] px-5 py-12">
+  const displayName = principal.fullName?.trim() || principal.email || "SAT12 account";
+  return <ManagementPortalShell account={{ aal: principal.aal, displayName, role: principal.role }} logoutAction={logoutAction}>
+    <main className="px-5 py-12">
       <section className="mx-auto max-w-2xl rounded-2xl border border-[var(--sat-border)] bg-white p-8">
         <h1 className="text-2xl font-bold text-[var(--sat-charcoal)]">Your SAT12 account</h1>
         <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
@@ -27,9 +29,9 @@ export default async function AccountPage() {
         </dl>
         <div className="mt-8 flex flex-wrap gap-3">
           <a className="rounded-lg border border-[var(--sat-border)] px-5 py-3 text-sm font-semibold text-zinc-800" href="/auth/mfa">Manage authenticator</a>
-          <form action={logoutAction}><button className="rounded-lg bg-[var(--sat-red)] px-5 py-3 text-sm font-semibold text-white" type="submit">Sign out</button></form>
+          <a className="rounded-lg bg-[var(--sat-red)] px-5 py-3 text-sm font-semibold text-white" href="/dashboard">Back to Dashboard</a>
         </div>
       </section>
     </main>
-  );
+  </ManagementPortalShell>;
 }

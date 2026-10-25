@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, LogOut, UserRound } from "lucide-react";
+import { ChevronDown, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -99,6 +99,14 @@ export function AccountMenu({
           >
             <UserRound aria-hidden="true" size={17} />
             My Account
+          </Link>
+          <Link
+            className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:text-[var(--sat-red)] focus:bg-zinc-50 focus:outline-none"
+            href="/dashboard"
+            onClick={() => setOpen(false)}
+          >
+            <LayoutDashboard aria-hidden="true" size={17} />
+            Management Portal
           </Link>
           <form action={logoutAction}>
             <button
