@@ -102,3 +102,17 @@ it("tests the exact anonymous image across every non-public lifecycle state", as
     /select extensions\.results_eq\([\s\S]*?select id from public\.property_images[\s\S]*?values \('44000000-0000-4000-8000-000000000003'::uuid\)[\s\S]*?'anonymous reads only current published image metadata'/iu,
   );
 });
+
+it("scopes anonymous image visibility checks to deterministic test fixtures", async () => {
+  const source = await readFile(
+    path.resolve("supabase/tests/storage_rls.test.sql"),
+    "utf8",
+  );
+
+  expect(source).toMatch(
+    /select id from public\.property_images\s+where id in \([\s\S]*?'44000000-0000-4000-8000-000000000001'[\s\S]*?'44000000-0000-4000-8000-000000000007'[\s\S]*?\)\s+order by id[\s\S]*?'anonymous reads only current published image metadata'/iu,
+  );
+  expect(source).toMatch(
+    /select id from storage\.objects\s+where id in \([\s\S]*?'44000000-0000-4000-8000-000000000001'[\s\S]*?'44000000-0000-4000-8000-000000000021'[\s\S]*?\)\s+order by id[\s\S]*?'anonymous reads only current published image'/iu,
+  );
+});

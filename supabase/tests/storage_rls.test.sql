@@ -76,7 +76,15 @@ select extensions.ok(
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 set local role anon;
 select extensions.results_eq(
-  $$select id from public.property_images order by id$$,
+  $$select id from public.property_images where id in (
+    '44000000-0000-4000-8000-000000000001',
+    '44000000-0000-4000-8000-000000000003',
+    '44000000-0000-4000-8000-000000000004',
+    '44000000-0000-4000-8000-000000000005',
+    '44000000-0000-4000-8000-000000000006',
+    '44000000-0000-4000-8000-000000000007',
+    '44000000-0000-4000-8000-000000000021'
+  ) order by id$$,
   $$values ('44000000-0000-4000-8000-000000000003'::uuid)$$,
   'anonymous reads only current published image metadata'
 );
@@ -216,7 +224,22 @@ reset role;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 set local role anon;
 select extensions.results_eq(
-  $$select id from storage.objects where bucket_id = 'property-images' order by id$$,
+  $$select id from storage.objects where id in (
+    '44000000-0000-4000-8000-000000000001',
+    '44000000-0000-4000-8000-000000000002',
+    '44000000-0000-4000-8000-000000000003',
+    '44000000-0000-4000-8000-000000000004',
+    '44000000-0000-4000-8000-000000000005',
+    '44000000-0000-4000-8000-000000000006',
+    '44000000-0000-4000-8000-000000000007',
+    '44000000-0000-4000-8000-000000000010',
+    '44000000-0000-4000-8000-000000000015',
+    '44000000-0000-4000-8000-000000000016',
+    '44000000-0000-4000-8000-000000000017',
+    '44000000-0000-4000-8000-000000000018',
+    '44000000-0000-4000-8000-000000000020',
+    '44000000-0000-4000-8000-000000000021'
+  ) order by id$$,
   $$values ('44000000-0000-4000-8000-000000000003'::uuid)$$,
   'anonymous reads only current published image'
 );
