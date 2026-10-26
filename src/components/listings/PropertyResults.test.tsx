@@ -67,4 +67,15 @@ describe("PropertyResults", () => {
     expect(onSelect).toHaveBeenCalledWith("high");
     expect(cardAction.closest("button")?.querySelector("button")).toBeNull();
   });
+
+  it("links every stable property ID to its public details without selecting the card", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(<PropertyResults properties={properties} isLoading={false} selectedPropertyId={null} onSelect={onSelect} onClearFilters={() => undefined} />);
+
+    const details = screen.getByRole("link", { name: "View details for 4 BHK Villa" });
+    expect(details).toHaveAttribute("href", "/properties/high");
+    await user.click(details);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
 });

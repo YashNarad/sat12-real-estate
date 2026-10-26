@@ -1,4 +1,5 @@
 import { Bath, BedDouble, Heart, MapPin, Maximize } from "lucide-react";
+import Link from "next/link";
 import { formatArea, formatINR } from "@/lib/formatters";
 import type { Property } from "@/types/property";
 import { PropertyImageGallery } from "./PropertyImageGallery";
@@ -33,6 +34,13 @@ export function PropertyCard({ property, selected, favorite, eagerImage = false,
           <span className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500"><span>{property.status}</span>{property.reraApproved && <><span aria-hidden="true" className="h-3 w-px bg-zinc-300" /><span>RERA Approved</span></>}</span>
         </span>
       </button>
+      <Link
+        aria-label={`View details for ${property.title}`}
+        className="mx-4 mb-4 inline-flex min-h-10 items-center justify-center rounded-md border border-[var(--sat-red)] px-4 text-sm font-semibold text-[var(--sat-red)] transition-colors hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-[var(--sat-red)]"
+        href={`/properties/${property.id}`}
+      >
+        View details
+      </Link>
       <button aria-label={`${favorite ? "Remove" : "Save"} ${property.title}`} aria-pressed={favorite} className="absolute right-3 top-3 grid size-9 place-items-center rounded-full bg-white/95 text-zinc-700 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sat-red)]" onClick={() => onToggleFavorite(property.id)} type="button"><Heart fill={favorite ? "#DC0011" : "none"} size={20} stroke={favorite ? "#DC0011" : "currentColor"} /></button>
     </article>
   );

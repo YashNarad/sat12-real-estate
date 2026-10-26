@@ -127,6 +127,9 @@ describe("mapPublishedProperty", () => {
     { ...row, archived_at: "2026-10-19T00:00:00.000Z" },
     { ...row, published_revision_id: "44444444-4444-4444-8444-444444444444" },
     { ...row, published_revision: { ...revision, status: "draft" as const } },
+    { ...row, published_revision: { ...revision, status: "submitted" as const } },
+    { ...row, published_revision: { ...revision, status: "rejected" as const } },
+    { ...row, published_revision: { ...revision, status: "superseded" as const } },
     { ...row, published_revision: { ...revision, city: "Pune" } },
     { ...row, published_revision: { ...revision, price_inr: -1 } },
   ])("rejects malformed or non-public rows", (invalid) => {

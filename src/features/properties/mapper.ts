@@ -19,6 +19,10 @@ export interface PublishedRevisionRow extends Pick<Revision,
   | "bedrooms" | "bathrooms" | "area_sq_ft" | "construction_status"
   | "rera_approved" | "badge" | "status" | "published_at"
 > {
+  description?: string;
+  state?: string;
+  postal_code?: string | null;
+  rera_number?: string | null;
   property_images: PublishedPropertyImageRow[];
 }
 
@@ -42,11 +46,12 @@ const rowSchema = z.object({
     listing_intent: z.enum(["buy", "rent"]),
     property_type: z.enum(["apartment", "villa", "independent_house", "plot"]),
     price_inr: z.number().int().positive(), locality: z.string().min(1), city: z.literal("Nagpur"),
+    state: z.string().min(1).optional(), postal_code: z.string().nullable().optional(), description: z.string().min(1).optional(),
     latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180),
     bedrooms: z.number().int().nonnegative(), bathrooms: z.number().int().nonnegative(),
     area_sq_ft: z.number().int().positive(),
     construction_status: z.enum(["ready_to_move", "under_construction"]),
-    rera_approved: z.boolean(), badge: z.enum(["featured", "new"]).nullable(),
+    rera_approved: z.boolean(), rera_number: z.string().nullable().optional(), badge: z.enum(["featured", "new"]).nullable(),
     status: z.literal("published"), published_at: z.string().min(1),
     property_images: z.array(imageSchema),
   }),
@@ -92,6 +97,10 @@ export function mapPublishedProperty(input: PublishedPropertyRow, signedImageUrl
     areaSqFt: revision.area_sq_ft,
     status: revision.construction_status === "ready_to_move" ? "Ready to Move" : "Under Construction",
     reraApproved: revision.rera_approved,
+    ...(revision.description ? { description: revision.description } : {}),
+    ...(revision.state ? { state: revision.state } : {}),
+    ...(revision.postal_code ? { postalCode: revision.postal_code } : {}),
+    ...(revision.rera_number ? { reraNumber: revision.rera_number } : {}),
     ...(revision.badge ? { badge: revision.badge === "featured" ? "Featured" as const : "New" as const } : {}),
   };
 }

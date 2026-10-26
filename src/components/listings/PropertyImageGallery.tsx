@@ -29,7 +29,16 @@ export function PropertyImageGallery({ eager = false, fallbackSrc = PROPERTY_IMA
   };
 
   return (
-    <span aria-label={`Property images for ${propertyTitle}`} className="relative block h-full overflow-hidden" role="group">
+    <span
+      aria-label={`Property images for ${propertyTitle}`}
+      className="relative block h-full overflow-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--sat-red)]"
+      onKeyDown={(event) => {
+        if (event.key === "ArrowLeft") { event.preventDefault(); move(-1); }
+        if (event.key === "ArrowRight") { event.preventDefault(); move(1); }
+      }}
+      role="group"
+      tabIndex={safeImages.length > 1 ? 0 : undefined}
+    >
       <Image
         alt={current.alt}
         className="object-cover"

@@ -18,11 +18,14 @@ function publishedRow(overrides: Partial<PublishedPropertyRow> = {}): PublishedP
       id: revisionId,
       property_id: id,
       title: "Published home",
+      description: "A calm, light-filled home close to central Nagpur.",
       listing_intent: "buy",
       property_type: "apartment",
       price_inr: 8_000_000,
       locality: "Dharampeth",
       city: "Nagpur",
+      state: "Maharashtra",
+      postal_code: "440010",
       latitude: 21.14,
       longitude: 79.05,
       bedrooms: 3,
@@ -30,6 +33,7 @@ function publishedRow(overrides: Partial<PublishedPropertyRow> = {}): PublishedP
       area_sq_ft: 1400,
       construction_status: "ready_to_move",
       rera_approved: true,
+      rera_number: "P50500001234",
       badge: null,
       status: "published",
       published_at: "2026-10-18T11:00:00.000Z",
@@ -44,7 +48,8 @@ function publishedRow(overrides: Partial<PublishedPropertyRow> = {}): PublishedP
 
 function clientResult(data: PublishedPropertyRow[] | null, error: unknown = null) {
   const order = vi.fn().mockResolvedValue({ data, error });
-  const not = vi.fn(() => ({ order }));
+  const propertyEq = vi.fn(() => ({ order }));
+  const not = vi.fn(() => ({ order, eq: propertyEq }));
   const is = vi.fn(() => ({ not }));
   const select = vi.fn(() => ({ is }));
   const publishedImages = data?.[0]?.published_revision?.property_images.toSorted((a, b) => a.position - b.position) ?? [];
@@ -57,7 +62,7 @@ function clientResult(data: PublishedPropertyRow[] | null, error: unknown = null
   }));
   return {
     client: { from: vi.fn((table: string) => table === "properties" ? { select } : { select: imageSelect }), storage: { from: vi.fn(() => ({ createSignedUrl })) } },
-    calls: { select, is, not, order, imageSelect, imageEq, imageOrder, createSignedUrl },
+    calls: { select, is, not, propertyEq, order, imageSelect, imageEq, imageOrder, createSignedUrl },
   };
 }
 
@@ -129,5 +134,31 @@ describe("Supabase property repository", () => {
     expect(await createSupabasePropertyRepository(harness.client, projectUrl).listPublished()).toHaveLength(1);
     expect(harness.calls.imageEq).toHaveBeenCalledTimes(1);
     expect(harness.calls.imageEq).toHaveBeenCalledWith("revision_id", active.published_revision!.id);
+  });
+
+  it("returns one exact published property with its public detail fields", async () => {
+    const row = publishedRow();
+    const harness = clientResult([row]);
+    const property = await createSupabasePropertyRepository(harness.client, projectUrl).findPublishedById(row.id);
+
+    expect(property).toMatchObject({
+      id: row.id,
+      description: "A calm, light-filled home close to central Nagpur.",
+      state: "Maharashtra",
+      postalCode: "440010",
+      reraNumber: "P50500001234",
+    });
+    expect(harness.calls.propertyEq).toHaveBeenCalledWith("id", row.id);
+    expect(harness.calls.imageEq).toHaveBeenCalledTimes(1);
+    expect(property?.images?.map(({ alt }) => alt)).toEqual(["Primary", "Later"]);
+  });
+
+  it("returns null instead of exposing archived, stale, or unknown properties", async () => {
+    const archived = publishedRow({ archived_at: "2026-10-20T00:00:00.000Z" });
+    const harness = clientResult([archived]);
+    const repository = createSupabasePropertyRepository(harness.client, projectUrl);
+
+    await expect(repository.findPublishedById(archived.id)).resolves.toBeNull();
+    await expect(repository.findPublishedById("99999999-9999-4999-8999-999999999999")).resolves.toBeNull();
   });
 });

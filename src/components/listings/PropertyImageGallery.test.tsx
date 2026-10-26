@@ -38,4 +38,15 @@ describe("PropertyImageGallery", () => {
     await user.click(screen.getByRole("button", { name: "Next image for Home" }));
     expect(screen.getByRole("img", { name: "Living room" })).toBeInTheDocument();
   });
+
+  it("supports arrow-key navigation in the full gallery", async () => {
+    const user = userEvent.setup();
+    render(<PropertyImageGallery images={images} propertyTitle="Home" sizes="100vw" />);
+    const gallery = screen.getByRole("group", { name: "Property images for Home" });
+    gallery.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("img", { name: "Living room" })).toBeInTheDocument();
+    await user.keyboard("{ArrowLeft}");
+    expect(screen.getByRole("img", { name: "Front view" })).toBeInTheDocument();
+  });
 });

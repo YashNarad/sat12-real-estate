@@ -26,6 +26,10 @@ export interface Property {
   areaSqFt: number;
   status: PropertyStatus;
   reraApproved: boolean;
+  description?: string;
+  state?: string;
+  postalCode?: string;
+  reraNumber?: string;
   badge?: "Featured" | "New";
 }
 
