@@ -21,6 +21,9 @@ vi.mock("@/components/layout/HeaderAccount", () => ({
 vi.mock("@/components/properties/PropertyLocationMap", () => ({
   PropertyLocationMap: ({ property }: { property: Property }) => <div aria-label={`Map showing ${property.title}`} />,
 }));
+vi.mock("@/components/enquiries/EnquiryForm", () => ({
+  EnquiryForm: ({ propertyTitle, submissionEnabled }: { propertyTitle: string; submissionEnabled: boolean }) => <div aria-label={`Enquiry form for ${propertyTitle}`}>{submissionEnabled ? "Enabled" : "Enquiries unavailable"}</div>,
+}));
 
 import { generateMetadata, PropertyDetailsContent } from "./page";
 
@@ -61,8 +64,7 @@ describe("public property details", () => {
     expect(screen.getByText("P50500001234")).toBeInTheDocument();
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
     expect(screen.getByLabelText(`Map showing ${publishedProperty.title}`)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Interested in this property?" })).toBeInTheDocument();
-    expect(screen.getByText(/secure enquiries are coming soon/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(`Enquiry form for ${publishedProperty.title}`)).toHaveTextContent("Enquiries unavailable");
     expect(screen.queryByText(/owner email|owner phone/i)).not.toBeInTheDocument();
   });
 

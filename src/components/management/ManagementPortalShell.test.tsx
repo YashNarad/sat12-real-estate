@@ -36,6 +36,7 @@ describe("ManagementPortalShell", () => {
     renderShell("owner_agent");
     expect(screen.getAllByRole("link", { name: "My properties" })).not.toHaveLength(0);
     expect(screen.getAllByRole("link", { name: "Property images" })).not.toHaveLength(0);
+    expect(screen.getAllByRole("link", { name: "Buyer enquiries" })).not.toHaveLength(0);
     expect(screen.queryByRole("link", { name: "Property moderation" })).not.toBeInTheDocument();
   });
 

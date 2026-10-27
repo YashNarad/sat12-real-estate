@@ -8,6 +8,7 @@ import { Bath, BedDouble, Building2, CheckCircle2, MapPin, Maximize, ShieldCheck
 import { HeaderAccount, HeaderAccountFallback } from "@/components/layout/HeaderAccount";
 import { PropertyImageGallery } from "@/components/listings/PropertyImageGallery";
 import { PropertyLocationMap } from "@/components/properties/PropertyLocationMap";
+import { EnquiryForm } from "@/components/enquiries/EnquiryForm";
 import { getPublishedProperty } from "@/features/properties/supabase-repository";
 import { formatArea, formatINR } from "@/lib/formatters";
 
@@ -83,11 +84,7 @@ export async function PropertyDetailsContent({ propertyId }: { propertyId: strin
               </div>
             </section>
 
-            <section className="rounded-2xl bg-[var(--sat-charcoal)] p-6 text-white sm:p-8">
-              <h2 className="text-xl font-bold">Interested in this property?</h2>
-              <p className="mt-3 text-sm leading-6 text-zinc-300">Secure enquiries are coming soon. We will never display an owner’s private contact information on a public listing.</p>
-              <Link className="mt-5 inline-flex min-h-11 items-center rounded-lg bg-white px-5 text-sm font-bold text-[var(--sat-charcoal)] focus-visible:ring-2 focus-visible:ring-white" href="/auth/login">Sign in to SAT12</Link>
-            </section>
+            <EnquiryForm propertyId={property.id} propertyTitle={property.title} submissionEnabled={process.env.SAT12_ENQUIRIES_ENABLED === "true"} />
           </aside>
         </section>
       </main>

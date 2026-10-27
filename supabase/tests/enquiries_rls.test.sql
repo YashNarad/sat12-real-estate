@@ -1,61 +1,85 @@
-select extensions.plan(7);
+select extensions.plan(24);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
-  ('31000000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'sender@example.test', '', now(), '{}', '{}', now(), now()),
-  ('31000000-0000-4000-8000-000000000002', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'owner@example.test', '', now(), '{}', '{}', now(), now()),
-  ('31000000-0000-4000-8000-000000000003', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'unrelated@example.test', '', now(), '{}', '{}', now(), now()),
-  ('31000000-0000-4000-8000-000000000004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'enquiry-admin@example.test', '', now(), '{}', '{}', now(), now());
-update public.profiles set role = 'owner_agent' where id = '31000000-0000-4000-8000-000000000002';
-update public.profiles set role = 'admin' where id = '31000000-0000-4000-8000-000000000004';
-insert into public.properties (id, owner_id, slug)
-values ('32000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000002', 'enquiry-published-property');
+  ('51000000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'lead-owner-a@example.test', '', now(), '{}', '{}', now(), now()),
+  ('51000000-0000-4000-8000-000000000002', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'lead-owner-b@example.test', '', now(), '{}', '{}', now(), now()),
+  ('51000000-0000-4000-8000-000000000003', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'lead-user@example.test', '', now(), '{}', '{}', now(), now()),
+  ('51000000-0000-4000-8000-000000000004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'lead-admin@example.test', '', now(), '{}', '{}', now(), now());
+update public.profiles set role = 'owner_agent' where id in ('51000000-0000-4000-8000-000000000001', '51000000-0000-4000-8000-000000000002');
+update public.profiles set role = 'admin' where id = '51000000-0000-4000-8000-000000000004';
+
+insert into public.properties (id, owner_id, slug, archived_at) values
+  ('52000000-0000-4000-8000-000000000001', '51000000-0000-4000-8000-000000000001', 'lead-published', null),
+  ('52000000-0000-4000-8000-000000000002', '51000000-0000-4000-8000-000000000001', 'lead-draft', null),
+  ('52000000-0000-4000-8000-000000000003', '51000000-0000-4000-8000-000000000001', 'lead-submitted', null),
+  ('52000000-0000-4000-8000-000000000004', '51000000-0000-4000-8000-000000000001', 'lead-rejected', null),
+  ('52000000-0000-4000-8000-000000000005', '51000000-0000-4000-8000-000000000001', 'lead-archived', now());
+
 insert into public.property_revisions (id, property_id, revision_number, title, description, listing_intent, property_type, price_inr, locality, latitude, longitude, bedrooms, bathrooms, area_sq_ft, construction_status, status, published_at, created_by)
-values ('33000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000001', 1, 'Published Home', 'Published home for enquiry tests', 'buy', 'apartment', 5000000, 'Dharampeth', 21.14, 79.05, 2, 2, 1000, 'ready_to_move', 'published', now(), '31000000-0000-4000-8000-000000000002');
-update public.properties set published_revision_id = '33000000-0000-4000-8000-000000000001' where id = '32000000-0000-4000-8000-000000000001';
-insert into public.enquiries (id, property_id, property_revision_id_at_submission, sender_id, name, email, message)
-values ('34000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000001', '33000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000001', 'Test Sender', 'sender@example.test', 'Please contact me about this home.');
+values
+  ('53000000-0000-4000-8000-000000000001', '52000000-0000-4000-8000-000000000001', 1, 'Published lead home', 'Published lead test property.', 'buy', 'apartment', 5000000, 'Dharampeth', 21.14, 79.05, 2, 2, 1000, 'ready_to_move', 'published', now(), '51000000-0000-4000-8000-000000000001'),
+  ('53000000-0000-4000-8000-000000000002', '52000000-0000-4000-8000-000000000002', 1, 'Draft lead home', 'Draft lead test property.', 'buy', 'apartment', 5000000, 'Dharampeth', 21.14, 79.05, 2, 2, 1000, 'ready_to_move', 'draft', null, '51000000-0000-4000-8000-000000000001'),
+  ('53000000-0000-4000-8000-000000000003', '52000000-0000-4000-8000-000000000003', 1, 'Submitted lead home', 'Submitted lead test property.', 'buy', 'apartment', 5000000, 'Dharampeth', 21.14, 79.05, 2, 2, 1000, 'ready_to_move', 'submitted', null, '51000000-0000-4000-8000-000000000001'),
+  ('53000000-0000-4000-8000-000000000004', '52000000-0000-4000-8000-000000000004', 1, 'Rejected lead home', 'Rejected lead test property.', 'buy', 'apartment', 5000000, 'Dharampeth', 21.14, 79.05, 2, 2, 1000, 'ready_to_move', 'rejected', null, '51000000-0000-4000-8000-000000000001'),
+  ('53000000-0000-4000-8000-000000000005', '52000000-0000-4000-8000-000000000005', 1, 'Archived lead home', 'Archived lead test property.', 'buy', 'apartment', 5000000, 'Dharampeth', 21.14, 79.05, 2, 2, 1000, 'ready_to_move', 'published', now(), '51000000-0000-4000-8000-000000000001');
+update public.properties set published_revision_id = '53000000-0000-4000-8000-000000000001' where id = '52000000-0000-4000-8000-000000000001';
+update public.properties set published_revision_id = '53000000-0000-4000-8000-000000000005' where id = '52000000-0000-4000-8000-000000000005';
+select set_config('app.settings.enquiry_submissions_enabled', 'on', true);
 
 set local role anon;
-select extensions.throws_ok(
-  $$insert into public.enquiries (property_id, property_revision_id_at_submission, sender_id, name, email, message) values ('32000000-0000-4000-8000-000000000001', '33000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000001', 'Anon User', 'anon@example.test', 'Anonymous enquiry is forbidden.')$$,
-  '42501', null, 'anonymous cannot create enquiries'
-);
+select extensions.is((select count(*) from public.enquiries), 0::bigint, 'anonymous cannot list enquiries');
+select extensions.throws_ok($$insert into public.enquiries (property_id, property_revision_id_at_submission, recipient_id, name, email, message) values ('52000000-0000-4000-8000-000000000001','53000000-0000-4000-8000-000000000001','51000000-0000-4000-8000-000000000001','Buyer','buyer@example.test','Direct inserts stay forbidden.')$$, '42501', null, 'anonymous direct insert is denied');
+select extensions.lives_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000001','Buyer Name','buyer@example.test','', 'Please arrange a viewing this weekend.')$$, 'anonymous submits to a published property through the RPC');
+reset role;
+select extensions.ok(exists(select 1 from public.enquiries where property_id='52000000-0000-4000-8000-000000000001' and property_revision_id_at_submission='53000000-0000-4000-8000-000000000001' and recipient_id='51000000-0000-4000-8000-000000000001' and sender_id is null), 'submission snapshots revision and trusted recipient');
+
+set local role anon;
+select extensions.is((select count(*) from public.enquiries), 0::bigint, 'anonymous still cannot read submitted buyer details');
+select extensions.throws_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000001','Buyer Name','buyer@example.test','', 'Please arrange a second viewing.')$$, '23505', 'SAT12_ENQUIRY_DUPLICATE', 'duplicate submission is rejected');
+select extensions.throws_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000002','Buyer Name','draft@example.test','', 'This draft must not accept a lead.')$$, 'P0002', 'SAT12_ENQUIRY_PROPERTY_UNAVAILABLE', 'draft property is rejected');
+select extensions.throws_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000003','Buyer Name','submitted@example.test','', 'This submission must not accept a lead.')$$, 'P0002', 'SAT12_ENQUIRY_PROPERTY_UNAVAILABLE', 'submitted property is rejected');
+select extensions.throws_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000004','Buyer Name','rejected@example.test','', 'This rejected listing must not accept a lead.')$$, 'P0002', 'SAT12_ENQUIRY_PROPERTY_UNAVAILABLE', 'rejected property is rejected');
+select extensions.throws_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000005','Buyer Name','archived@example.test','', 'This archived listing must not accept a lead.')$$, 'P0002', 'SAT12_ENQUIRY_PROPERTY_UNAVAILABLE', 'archived property is rejected');
+select extensions.throws_ok($$select public.submit_property_enquiry('52999999-0000-4000-8000-000000000099','Buyer Name','unknown@example.test','', 'This unknown listing must not accept a lead.')$$, 'P0002', 'SAT12_ENQUIRY_PROPERTY_UNAVAILABLE', 'unknown property is rejected');
+select extensions.throws_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000001','Buyer Name','malformed@example.test','not-a-phone!', 'This malformed phone must be rejected.')$$, '22023', 'SAT12_ENQUIRY_INVALID', 'malformed submission is rejected by the database');
 reset role;
 
 set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"31000000-0000-4000-8000-000000000001","aal":"aal1","role":"authenticated"}', true);
-select extensions.lives_ok(
-  $$insert into public.enquiries (property_id, property_revision_id_at_submission, sender_id, name, email, message) values ('32000000-0000-4000-8000-000000000001', '33000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000001', 'Test Sender', 'sender@example.test', 'I would like another property viewing.')$$,
-  'authenticated user creates an enquiry'
-);
-select extensions.is((select count(*) from public.enquiries), 2::bigint, 'sender reads own enquiry');
+select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-000000000003","aal":"aal1","role":"authenticated"}', true);
+select extensions.lives_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000001','Signed-in Buyer','signed-in@example.test','', 'Please share the available viewing times.')$$, 'authenticated sender submits through the RPC');
+select extensions.is((select count(*) from public.enquiries where sender_id='51000000-0000-4000-8000-000000000003'), 1::bigint, 'sender reads own enquiry');
 reset role;
 
 set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"31000000-0000-4000-8000-000000000003","aal":"aal1","role":"authenticated"}', true);
-select extensions.is((select count(*) from public.enquiries), 0::bigint, 'unrelated user cannot read enquiry');
+select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-000000000003","aal":"aal1","role":"authenticated"}', true);
+select extensions.is((select count(*) from public.enquiries where sender_id is null), 0::bigint, 'unrelated user cannot read enquiries');
+select extensions.throws_ok($$select public.update_enquiry_status((select id from public.enquiries where sender_id is null limit 1), 'contacted')$$, '42501', 'SAT12_ENQUIRY_FORBIDDEN', 'unrelated user cannot change status');
 reset role;
 
 set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"31000000-0000-4000-8000-000000000004","aal":"aal2","role":"authenticated"}', true);
-select extensions.is((select count(*) from public.enquiries), 2::bigint, 'aal2 admin reads enquiries');
+select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-000000000001","aal":"aal1","role":"authenticated"}', true);
+select extensions.is((select count(*) from public.enquiries), 2::bigint, 'snapshotted recipient reads own enquiries');
+select extensions.lives_ok($$select public.update_enquiry_status((select id from public.enquiries where sender_id is null limit 1), 'contacted')$$, 'recipient changes allowed status');
+select extensions.throws_ok($$update public.enquiries set email='changed@example.test'$$, '42501', null, 'recipient cannot update buyer fields directly');
+reset role;
+
+update public.properties set owner_id='51000000-0000-4000-8000-000000000002' where id='52000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-000000000002","aal":"aal1","role":"authenticated"}', true);
+select extensions.is((select count(*) from public.enquiries), 0::bigint, 'new property owner cannot read historic enquiry');
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-000000000001","aal":"aal1","role":"authenticated"}', true);
+select extensions.is((select count(*) from public.enquiries), 2::bigint, 'original recipient retains historic enquiries after transfer');
 reset role;
 
 set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"31000000-0000-4000-8000-000000000002","aal":"aal1","role":"authenticated"}', true);
-select extensions.lives_ok(
-  $$update public.enquiries set status = 'contacted' where id = '34000000-0000-4000-8000-000000000001'$$,
-  'owner changes enquiry status'
-);
-reset role;
-
-set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"31000000-0000-4000-8000-000000000001","aal":"aal1","role":"authenticated"}', true);
-select extensions.throws_ok(
-  $$update public.enquiries set message = 'Attempted replacement message' where id = '34000000-0000-4000-8000-000000000001'$$,
-  '42501', null, 'message fields remain immutable'
-);
+select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-000000000004","aal":"aal1","role":"authenticated"}', true);
+select extensions.is((select count(*) from public.enquiries), 0::bigint, 'AAL1 admin cannot read enquiries');
+select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-000000000004","aal":"aal2","role":"authenticated"}', true);
+select extensions.is((select count(*) from public.enquiries), 2::bigint, 'AAL2 admin reads enquiries');
+select extensions.throws_ok($$select public.update_enquiry_status((select id from public.enquiries limit 1), 'spam')$$, '22023', 'SAT12_ENQUIRY_STATUS_INVALID', 'unsupported owner-facing status is rejected');
 reset role;
 
 select * from extensions.finish();

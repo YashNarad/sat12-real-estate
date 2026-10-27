@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, ChevronRight, ImageIcon, LayoutDashboard, LogOut, Menu, ShieldCheck, UserCog, Users } from "lucide-react";
+import { Building2, ChevronRight, ImageIcon, Inbox, LayoutDashboard, LogOut, Menu, ShieldCheck, UserCog, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,6 +12,7 @@ const links: PortalLink[] = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Overview" },
   { href: "/dashboard/properties", icon: Building2, label: "My properties", roles: ["owner_agent"] },
   { href: "/dashboard/properties", icon: ImageIcon, label: "Property images", roles: ["owner_agent"] },
+  { href: "/dashboard/enquiries", icon: Inbox, label: "Buyer enquiries", roles: ["owner_agent"] },
   { href: "/admin/listings", icon: ShieldCheck, label: "Property moderation", roles: ["admin"] },
   { href: "/admin/users", icon: Users, label: "User approvals", roles: ["admin"] },
   { href: "/account", icon: UserCog, label: "Account settings" },
@@ -39,6 +40,7 @@ function SignOut({ action }: { action: () => Promise<void> }) {
 function breadcrumbLabel(pathname: string) {
   if (pathname.startsWith("/dashboard/properties/")) return "Property editor";
   if (pathname === "/dashboard/properties") return "My properties";
+  if (pathname === "/dashboard/enquiries") return "Buyer enquiries";
   if (pathname === "/admin/listings") return "Property moderation";
   if (pathname === "/admin/users") return "User approvals";
   if (pathname === "/auth/mfa") return "Security / MFA";

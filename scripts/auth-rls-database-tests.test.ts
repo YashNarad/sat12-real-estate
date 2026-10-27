@@ -29,15 +29,17 @@ describe("Task 2 cloud database test coverage", () => {
     expect(source).toMatch(/second admin bootstrap is refused/i);
   });
 
-  it("covers authenticated enquiry ownership and immutable content", async () => {
+  it("covers restricted enquiry submission, recipient isolation, and immutable content", async () => {
     const source = await sql("enquiries_rls.test.sql");
 
-    expect(source).toMatch(/anonymous cannot create enquiries/i);
+    expect(source).toMatch(/anonymous direct insert is denied/i);
+    expect(source).toMatch(/anonymous submits to a published property through the rpc/i);
     expect(source).toMatch(/sender reads own enquiry/i);
-    expect(source).toMatch(/unrelated user cannot read enquiry/i);
-    expect(source).toMatch(/owner changes enquiry status/i);
-    expect(source).toMatch(/message fields remain immutable/i);
-    expect(source).toMatch(/authenticated user creates an enquiry/i);
+    expect(source).toMatch(/unrelated user cannot read enquiries/i);
+    expect(source).toMatch(/recipient changes allowed status/i);
+    expect(source).toMatch(/recipient cannot update buyer fields directly/i);
+    expect(source).toMatch(/authenticated sender submits through the rpc/i);
+    expect(source).toMatch(/new property owner cannot read historic enquiry/i);
     expect(source).toMatch(/aal2 admin reads enquiries/i);
   });
 
