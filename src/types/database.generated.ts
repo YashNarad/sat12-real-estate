@@ -25,7 +25,8 @@ export type Database = {
           phone: string | null
           property_id: string
           property_revision_id_at_submission: string
-          sender_id: string
+          recipient_id: string
+          sender_id: string | null
           status: Database["public"]["Enums"]["enquiry_status"]
           updated_at: string
         }
@@ -39,7 +40,8 @@ export type Database = {
           phone?: string | null
           property_id: string
           property_revision_id_at_submission: string
-          sender_id: string
+          recipient_id: string
+          sender_id?: string | null
           status?: Database["public"]["Enums"]["enquiry_status"]
           updated_at?: string
         }
@@ -53,7 +55,8 @@ export type Database = {
           phone?: string | null
           property_id?: string
           property_revision_id_at_submission?: string
-          sender_id?: string
+          recipient_id?: string
+          sender_id?: string | null
           status?: Database["public"]["Enums"]["enquiry_status"]
           updated_at?: string
         }
@@ -71,6 +74,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "property_revisions"
             referencedColumns: ["id", "property_id"]
+          },
+          {
+            foreignKeyName: "enquiries_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "enquiries_sender_id_fkey"
@@ -979,6 +989,23 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      submit_property_enquiry: {
+        Args: {
+          p_email: string
+          p_message: string
+          p_name: string
+          p_phone: string
+          p_property_id: string
+        }
+        Returns: string
+      }
+      update_enquiry_status: {
+        Args: {
+          p_enquiry_id: string
+          p_status: Database["public"]["Enums"]["enquiry_status"]
+        }
+        Returns: undefined
       }
     }
     Enums: {
