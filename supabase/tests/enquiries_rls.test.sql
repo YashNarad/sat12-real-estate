@@ -44,14 +44,14 @@ update public.properties set published_revision_id = '53000000-0000-4000-8000-00
 select set_config('app.settings.enquiry_submissions_enabled', 'on', true);
 
 set local role anon;
-select extensions.is((select count(*) from public.enquiries), 0::bigint, 'anonymous cannot list enquiries');
+select extensions.throws_ok($$select count(*) from public.enquiries$$, '42501', null, 'anonymous cannot list enquiries');
 select extensions.throws_ok($$insert into public.enquiries (property_id, property_revision_id_at_submission, recipient_id, name, email, message) values ('52000000-0000-4000-8000-000000000001','53000000-0000-4000-8000-000000000001','51000000-0000-4000-8000-000000000001','Buyer','buyer@example.test','Direct inserts stay forbidden.')$$, '42501', null, 'anonymous direct insert is denied');
 select extensions.lives_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000001','Buyer Name','buyer@example.test','', 'Please arrange a viewing this weekend.')$$, 'anonymous submits to a published property through the RPC');
 reset role;
 select extensions.ok(exists(select 1 from public.enquiries where property_id='52000000-0000-4000-8000-000000000001' and property_revision_id_at_submission='53000000-0000-4000-8000-000000000001' and recipient_id='51000000-0000-4000-8000-000000000001' and sender_id is null), 'submission snapshots revision and trusted recipient');
 
 set local role anon;
-select extensions.is((select count(*) from public.enquiries), 0::bigint, 'anonymous still cannot read submitted buyer details');
+select extensions.throws_ok($$select count(*) from public.enquiries$$, '42501', null, 'anonymous still cannot read submitted buyer details');
 select extensions.throws_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000001','Buyer Name','buyer@example.test','', 'Please arrange a second viewing.')$$, '23505', 'SAT12_ENQUIRY_DUPLICATE', 'duplicate submission is rejected');
 select extensions.throws_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000002','Buyer Name','draft@example.test','', 'This draft must not accept a lead.')$$, 'P0002', 'SAT12_ENQUIRY_PROPERTY_UNAVAILABLE', 'draft property is rejected');
 select extensions.throws_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000003','Buyer Name','submitted@example.test','', 'This submission must not accept a lead.')$$, 'P0002', 'SAT12_ENQUIRY_PROPERTY_UNAVAILABLE', 'submitted property is rejected');

@@ -31,7 +31,11 @@ describe("Task 2 cloud database test coverage", () => {
 
   it("covers restricted enquiry submission, recipient isolation, and immutable content", async () => {
     const source = await sql("enquiries_rls.test.sql");
+    const anonymousSelectDenials = source.match(
+      /extensions\.throws_ok\(\$\$select count\(\*\) from public\.enquiries\$\$,\s*'42501'/giu,
+    );
 
+    expect(anonymousSelectDenials).toHaveLength(2);
     expect(source).toMatch(/anonymous direct insert is denied/i);
     expect(source).toMatch(/anonymous submits to a published property through the rpc/i);
     expect(source).toMatch(/sender reads own enquiry/i);
