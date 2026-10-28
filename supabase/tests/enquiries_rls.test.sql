@@ -1,4 +1,4 @@
-select extensions.plan(24);
+select extensions.plan(35);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
@@ -62,6 +62,10 @@ select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-0000000
 select extensions.is((select count(*) from public.enquiries), 2::bigint, 'snapshotted recipient reads own enquiries');
 select extensions.lives_ok($$select public.update_enquiry_status((select id from public.enquiries where sender_id is null limit 1), 'contacted')$$, 'recipient changes allowed status');
 select extensions.throws_ok($$update public.enquiries set email='changed@example.test'$$, '42501', null, 'recipient cannot update buyer fields directly');
+select extensions.throws_ok($$update public.enquiries set recipient_id='51000000-0000-4000-8000-000000000002'$$, '42501', null, 'recipient cannot change snapshotted recipient');
+select extensions.throws_ok($$update public.enquiries set property_id='52000000-0000-4000-8000-000000000002'$$, '42501', null, 'recipient cannot change stable property');
+select extensions.throws_ok($$update public.enquiries set property_revision_id_at_submission='53000000-0000-4000-8000-000000000002'$$, '42501', null, 'recipient cannot change published revision snapshot');
+select extensions.throws_ok($$delete from public.enquiries$$, '42501', null, 'recipient cannot delete enquiries directly');
 reset role;
 
 update public.properties set owner_id='51000000-0000-4000-8000-000000000002' where id='52000000-0000-4000-8000-000000000001';
@@ -74,12 +78,42 @@ select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-0000000
 select extensions.is((select count(*) from public.enquiries), 2::bigint, 'original recipient retains historic enquiries after transfer');
 reset role;
 
+update public.properties set archived_at=now() where id='52000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-000000000001","aal":"aal1","role":"authenticated"}', true);
+select extensions.is((select count(*) from public.enquiries), 2::bigint, 'original recipient retains historic enquiries after property archival');
+reset role;
+update public.properties set published_revision_id=null where id='52000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-000000000001","aal":"aal1","role":"authenticated"}', true);
+select extensions.is((select count(*) from public.enquiries), 2::bigint, 'original recipient retains historic enquiries after unpublishing');
+reset role;
+
+update public.profiles set role='user' where id='51000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-000000000001","aal":"aal1","role":"authenticated"}', true);
+select extensions.is((select count(*) from public.enquiries), 0::bigint, 'downgraded recipient cannot read historic buyer details');
+select extensions.throws_ok($$select public.update_enquiry_status((select id from public.enquiries where sender_id is null limit 1), 'closed')$$, '42501', 'SAT12_ENQUIRY_FORBIDDEN', 'downgraded recipient cannot change enquiry status');
+reset role;
+
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-000000000004","aal":"aal1","role":"authenticated"}', true);
 select extensions.is((select count(*) from public.enquiries), 0::bigint, 'AAL1 admin cannot read enquiries');
+select extensions.throws_ok($$select public.update_enquiry_status((select id from public.enquiries limit 1), 'closed')$$, '42501', 'SAT12_ENQUIRY_FORBIDDEN', 'AAL1 admin cannot change enquiry status');
 select set_config('request.jwt.claims', '{"sub":"51000000-0000-4000-8000-000000000004","aal":"aal2","role":"authenticated"}', true);
 select extensions.is((select count(*) from public.enquiries), 2::bigint, 'AAL2 admin reads enquiries');
+select extensions.lives_ok($$select public.update_enquiry_status((select id from public.enquiries limit 1), 'closed')$$, 'AAL2 admin changes enquiry status');
 select extensions.throws_ok($$select public.update_enquiry_status((select id from public.enquiries limit 1), 'spam')$$, '22023', 'SAT12_ENQUIRY_STATUS_INVALID', 'unsupported owner-facing status is rejected');
+reset role;
+
+insert into public.enquiries (property_id, property_revision_id_at_submission, recipient_id, name, email, message, created_at)
+values
+  ('52000000-0000-4000-8000-000000000002','53000000-0000-4000-8000-000000000002','51000000-0000-4000-8000-000000000001','Rate Test','rate@example.test','Existing rate-limit fixture one.',statement_timestamp()),
+  ('52000000-0000-4000-8000-000000000003','53000000-0000-4000-8000-000000000003','51000000-0000-4000-8000-000000000001','Rate Test','rate@example.test','Existing rate-limit fixture two.',statement_timestamp()),
+  ('52000000-0000-4000-8000-000000000004','53000000-0000-4000-8000-000000000004','51000000-0000-4000-8000-000000000001','Rate Test','rate@example.test','Existing rate-limit fixture three.',statement_timestamp());
+update public.properties set archived_at=null, published_revision_id='53000000-0000-4000-8000-000000000001' where id='52000000-0000-4000-8000-000000000001';
+set local role anon;
+select extensions.throws_ok($$select public.submit_property_enquiry('52000000-0000-4000-8000-000000000001','Rate Test','rate@example.test','', 'The fourth hourly submission must fail.')$$, '54000', 'SAT12_ENQUIRY_RATE_LIMITED', 'global per-email hourly submission limit is enforced');
 reset role;
 
 select * from extensions.finish();

@@ -5,6 +5,15 @@ import { describe, expect, it } from "vitest";
 const migration = path.resolve("supabase/migrations/20261027120000_stage5a_secure_enquiries.sql");
 
 describe("Stage 5A enquiry migration", () => {
+  it("fails closed before schema changes when historic recipients need provenance review", async () => {
+    const sql = await readFile(migration, "utf8");
+    const guard = sql.indexOf("SAT12_ENQUIRY_HISTORIC_RECIPIENT_REVIEW_REQUIRED");
+    const schemaChange = sql.indexOf("alter table public.enquiries");
+    expect(guard).toBeGreaterThanOrEqual(0);
+    expect(guard).toBeLessThan(schemaChange);
+    expect(sql).not.toMatch(/set recipient_id = p\.owner_id/iu);
+  });
+
   it("snapshots a trusted recipient and permits anonymous senders without broad table writes", async () => {
     const sql = await readFile(migration, "utf8");
     expect(sql).toMatch(/add column recipient_id uuid/iu);
@@ -35,9 +44,15 @@ describe("Stage 5A enquiry migration", () => {
 
   it("keeps reads private and status updates restricted to the snapshotted recipient or AAL2 admin", async () => {
     const sql = await readFile(migration, "utf8");
-    expect(sql).toMatch(/recipient_id = \(select auth\.uid\(\)\)/iu);
+    expect(sql.match(/recipient_id = \(select auth\.uid\(\)\)[\s\S]{0,100}private\.is_owner_agent\(\)/giu)).toHaveLength(2);
     expect(sql).toMatch(/private\.is_aal2_admin\(\)/iu);
     expect(sql).toMatch(/p_status not in \('new', 'contacted', 'closed'\)/iu);
     expect(sql).not.toMatch(/grant usage on schema private to anon/iu);
+  });
+
+  it("serializes the global email throttle with a normalized transaction lock", async () => {
+    const sql = await readFile(migration, "utf8");
+    expect(sql).toMatch(/pg_advisory_xact_lock\(pg_catalog\.hashtextextended\(v_email,/iu);
+    expect(sql).not.toMatch(/pg_advisory_xact_lock[\s\S]{0,120}p_property_id::text \|\| ':' \|\| v_email/iu);
   });
 });

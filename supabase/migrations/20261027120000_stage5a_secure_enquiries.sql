@@ -1,13 +1,17 @@
-alter table public.enquiries
-  add column recipient_id uuid references public.profiles (id) on delete restrict;
+do $migration_guard$
+begin
+  if exists (select 1 from public.enquiries) then
+    raise exception using
+      errcode = '55000',
+      message = 'SAT12_ENQUIRY_HISTORIC_RECIPIENT_REVIEW_REQUIRED';
+  end if;
+end;
+$migration_guard$;
 
-update public.enquiries e
-set recipient_id = p.owner_id
-from public.properties p
-where p.id = e.property_id;
+alter table public.enquiries
+  add column recipient_id uuid not null references public.profiles (id) on delete restrict;
 
 alter table public.enquiries
-  alter column recipient_id set not null,
   alter column sender_id drop not null;
 
 create index enquiries_recipient_status_created_idx
@@ -24,7 +28,10 @@ create policy "recipients and aal2 admins read enquiries"
 on public.enquiries for select to authenticated
 using (
   sender_id = (select auth.uid())
-  or recipient_id = (select auth.uid())
+  or (
+    recipient_id = (select auth.uid())
+    and private.is_owner_agent()
+  )
   or private.is_aal2_admin()
 );
 
@@ -76,7 +83,10 @@ begin
     raise exception using errcode = 'P0002', message = 'SAT12_ENQUIRY_PROPERTY_UNAVAILABLE';
   end if;
 
-  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_property_id::text || ':' || v_email, 0));
+  -- A single normalized-email lock serializes both the global hourly threshold
+  -- and the narrower property/email duplicate check. Hash collisions can only
+  -- serialize unrelated callers; they cannot weaken either limit.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_email, 0));
   if exists (
     select 1 from public.enquiries e
     where e.property_id = p_property_id and lower(e.email) = v_email
@@ -115,7 +125,13 @@ begin
     raise exception using errcode = '22023', message = 'SAT12_ENQUIRY_STATUS_INVALID';
   end if;
   select * into v_enquiry from public.enquiries where id = p_enquiry_id for update;
-  if not found or not (v_enquiry.recipient_id = (select auth.uid()) or private.is_aal2_admin()) then
+  if not found or not (
+    (
+      v_enquiry.recipient_id = (select auth.uid())
+      and private.is_owner_agent()
+    )
+    or private.is_aal2_admin()
+  ) then
     raise exception using errcode = '42501', message = 'SAT12_ENQUIRY_FORBIDDEN';
   end if;
   update public.enquiries set status = p_status,
