@@ -1,20 +1,40 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import {
   AuthorizationError,
   hasRecentMfa,
   requireUser,
 } from "@/features/auth/authorization";
-import { enquiryFromFormData } from "@/features/enquiries/schema";
+import {
+  noOpEnquiryAbuseMetrics,
+  unconfiguredDistributedRateLimiter,
+  unconfiguredRateLimitKeyDeriver,
+  unconfiguredTrustedClientIpResolver,
+} from "@/features/enquiries/abuse-protection";
 import { createEnquiryService, type EnquiryResult } from "@/features/enquiries/service";
+import { submitPublicEnquiry } from "@/features/enquiries/submission";
 import { createServerClient } from "@/lib/supabase/server";
 
 export async function createEnquiryAction(_state: EnquiryResult, formData: FormData): Promise<EnquiryResult> {
-  const parsed = enquiryFromFormData(formData);
-  if (!parsed.success) return { ok: false, code: "VALIDATION", message: "Check the highlighted fields.", fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]> };
-  const client = await createServerClient();
-  return createEnquiryService(client as never, { enabled: process.env.SAT12_ENQUIRIES_ENABLED === "true" }).submit(parsed.data);
+  const enabled = process.env.SAT12_ENQUIRIES_ENABLED === "true";
+  const requestHeaders = enabled ? await headers() : new Headers();
+  return submitPublicEnquiry({
+    enabled,
+    headers: requestHeaders,
+    formData,
+    dependencies: {
+      resolver: unconfiguredTrustedClientIpResolver,
+      keyDeriver: unconfiguredRateLimitKeyDeriver,
+      limiter: unconfiguredDistributedRateLimiter,
+      metrics: noOpEnquiryAbuseMetrics,
+    },
+    submit: async (input) => {
+      const client = await createServerClient();
+      return createEnquiryService(client as never, { enabled: true }).submit(input);
+    },
+  });
 }
 
 export async function updateEnquiryStatusAction(_state: EnquiryResult, formData: FormData): Promise<EnquiryResult> {

@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const harness = vi.hoisted(() => ({ rpc: vi.fn(), role: "owner_agent", aal: "aal1", mfaVerifiedAt: null as number | null }));
+const harness = vi.hoisted(() => ({
+  rpc: vi.fn(),
+  headers: vi.fn(async () => new Headers({ "x-forwarded-for": "198.51.100.10" })),
+  role: "owner_agent",
+  aal: "aal1",
+  mfaVerifiedAt: null as number | null,
+}));
 vi.mock("@/lib/supabase/server", () => ({ createServerClient: vi.fn(async () => ({ rpc: harness.rpc })) }));
+vi.mock("next/headers", () => ({ headers: harness.headers }));
 vi.mock("@/features/auth/authorization", () => ({
   AuthorizationError: class AuthorizationError extends Error {},
   requireUser: vi.fn(async () => ({ role: harness.role, aal: harness.aal, mfaVerifiedAt: harness.mfaVerifiedAt })),
@@ -26,21 +33,19 @@ describe("enquiry actions", () => {
     process.env.SAT12_ENQUIRIES_ENABLED = "true";
   });
 
-  it("validates and sends a public enquiry without accepting recipient fields", async () => {
-    harness.rpc.mockResolvedValue({ data: "22222222-2222-4222-8222-222222222222", error: null });
-    const data = form({ recipientId: "attacker" });
-    await expect(createEnquiryAction({ ok: false, code: "VALIDATION", message: "" }, data)).resolves.toMatchObject({ ok: true });
-    expect(JSON.stringify(harness.rpc.mock.calls)).not.toContain("attacker");
-  });
-
-  it("rejects honeypot and oversized invalid input without an RPC", async () => {
-    await expect(createEnquiryAction({ ok: false, code: "VALIDATION", message: "" }, form({ website: "bot.example" }))).resolves.toMatchObject({ ok: false, code: "VALIDATION" });
+  it("fails closed before Supabase when production abuse protection is unconfigured", async () => {
+    await expect(createEnquiryAction({ ok: false, code: "VALIDATION", message: "" }, form())).resolves.toMatchObject({
+      ok: false,
+      code: "BACKEND_UNAVAILABLE",
+    });
+    expect(harness.headers).toHaveBeenCalledTimes(1);
     expect(harness.rpc).not.toHaveBeenCalled();
   });
 
-  it("reports the backend disabled without persisting buyer information", async () => {
+  it("reports the backend disabled without reading headers or persisting buyer information", async () => {
     delete process.env.SAT12_ENQUIRIES_ENABLED;
     await expect(createEnquiryAction({ ok: false, code: "VALIDATION", message: "" }, form())).resolves.toMatchObject({ ok: false, code: "BACKEND_UNAVAILABLE" });
+    expect(harness.headers).not.toHaveBeenCalled();
     expect(harness.rpc).not.toHaveBeenCalled();
   });
 

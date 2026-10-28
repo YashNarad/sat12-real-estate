@@ -27,6 +27,8 @@ Submission is therefore fail-closed twice:
 
 Stage 5B must not enable both gates until an enforceable edge/API rate limit (or equivalent approved abuse-control service), monitoring, incident response, and privacy notice are configured and verified.
 
+Stage 5C's provider-independent boundary and the remaining hosting, provider, monitoring, incident-response, and privacy prerequisites are documented in [`stage5c-enquiry-abuse-operations.md`](./stage5c-enquiry-abuse-operations.md). Both submission gates remain disabled.
+
 Before deployment, an aggregate read-only inspection must confirm the enquiries table is empty. The migration must then receive a non-applying preview, followed by separately authorized deployment and execution of the transactional pgTAP suite. The application and database submission gates remain disabled throughout those steps.
 
 ## Retention and consent decisions
