@@ -5,6 +5,7 @@
 - Anyone may complete the public form for a currently published, non-archived property after Stage 5B enables the guarded database function.
 - The database derives both the current published revision and recipient. The browser cannot choose an owner, recipient, status, or revision.
 - Anonymous callers can execute only `submit_property_enquiry`; they cannot select, insert, update, or delete enquiry rows directly.
+- The migration explicitly revokes the legacy authenticated column-level `INSERT` and `UPDATE` grants in addition to table-level privileges. A table-level `REVOKE` alone does not remove privileges that were granted on individual columns.
 - The account snapshotted as `recipient_id` may read buyer details and change status to `new`, `contacted`, or `closed` only while its authoritative profile role remains `owner_agent`. A later downgrade to `user` immediately removes recipient access at both the RLS and RPC layers.
 - AAL2 administrators may inspect and update enquiries only for moderation or support. AAL1 administrators receive no administrative enquiry access.
 - Authenticated senders may read their own enquiry under the existing participant model. They cannot change its status or contents.

@@ -22,6 +22,14 @@ describe("Stage 5A enquiry migration", () => {
     expect(sql).not.toMatch(/grant (?:all|insert|update) on public\.enquiries to anon/iu);
   });
 
+  it("revokes every legacy authenticated column write privilege as well as table writes", async () => {
+    const sql = await readFile(migration, "utf8");
+    expect(sql).toMatch(/revoke insert\s*\(\s*property_id,\s*property_revision_id_at_submission,\s*sender_id,\s*name,\s*email,\s*phone,\s*message\s*\)\s*on public\.enquiries from authenticated/iu);
+    expect(sql).toMatch(/revoke update\s*\(\s*status,\s*closed_at\s*\)\s*on public\.enquiries from authenticated/iu);
+    expect(sql).toMatch(/revoke insert on public\.enquiries from authenticated, anon/iu);
+    expect(sql).toMatch(/revoke update on public\.enquiries from authenticated, anon/iu);
+  });
+
   it("exposes only guarded submission and status RPCs with fixed search paths", async () => {
     const sql = await readFile(migration, "utf8");
     expect(sql).toMatch(/function public\.submit_property_enquiry\([\s\S]*security definer[\s\S]*set search_path = ''/iu);

@@ -1,4 +1,20 @@
-select extensions.plan(35);
+select extensions.plan(37);
+
+select extensions.ok(
+  not has_column_privilege('authenticated', 'public.enquiries', 'property_id', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.enquiries', 'property_revision_id_at_submission', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.enquiries', 'sender_id', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.enquiries', 'name', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.enquiries', 'email', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.enquiries', 'phone', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.enquiries', 'message', 'INSERT'),
+  'legacy authenticated insert column privileges are revoked'
+);
+select extensions.ok(
+  not has_column_privilege('authenticated', 'public.enquiries', 'status', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.enquiries', 'closed_at', 'UPDATE'),
+  'legacy authenticated update column privileges are revoked'
+);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values

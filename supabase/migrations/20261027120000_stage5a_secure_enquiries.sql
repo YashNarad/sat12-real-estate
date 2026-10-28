@@ -23,6 +23,19 @@ drop policy "owners and aal2 admins update enquiry status" on public.enquiries;
 
 revoke insert on public.enquiries from authenticated, anon;
 revoke update on public.enquiries from authenticated, anon;
+revoke insert (
+  property_id,
+  property_revision_id_at_submission,
+  sender_id,
+  name,
+  email,
+  phone,
+  message
+) on public.enquiries from authenticated;
+revoke update (
+  status,
+  closed_at
+) on public.enquiries from authenticated;
 
 create policy "recipients and aal2 admins read enquiries"
 on public.enquiries for select to authenticated
