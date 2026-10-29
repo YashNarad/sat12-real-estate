@@ -70,3 +70,9 @@ Buyer submissions remain blocked until all of the following are separately appro
 7. incident, deletion-request, and key-rotation runbooks;
 8. deployment verification of application and database fail-closed states;
 9. separate authorization to enable each submission gate.
+
+## Stage 5E provider preparation
+
+The conditionally approved primary architecture is Vercel Pro in Mumbai with Upstash Redis in Mumbai. Local provider adapters and the still-unexecuted hosted security procedure are documented in [`stage5e-vercel-upstash-validation.md`](./stage5e-vercel-upstash-validation.md).
+
+This preparation does not authorize provider accounts, credentials, connections, deployment, or activation. Hosted trusted-header spoofing, atomic Lua concurrency, ambiguous timeout, rotation, rollback, monitoring, availability-tier, India/cross-border, and legal/privacy checks remain activation blockers.

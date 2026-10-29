@@ -42,4 +42,21 @@ describe("Stage 5C enquiry abuse operations contract", () => {
     const source = await document("stage5a-enquiries.md");
     expect(source).toMatch(/stage5c-enquiry-abuse-operations\.md/iu);
   });
+
+  it("defines the hosted Vercel and Upstash validation boundary", async () => {
+    const source = await document("stage5e-vercel-upstash-validation.md");
+
+    expect(source).toMatch(/x-vercel-forwarded-for/iu);
+    expect(source).toMatch(/attacker-controlled/iu);
+    expect(source).toMatch(/direct deployment URL/iu);
+    expect(source).toMatch(/one atomic EVAL/iu);
+    expect(source).toMatch(/no automatic retry/iu);
+    expect(source).toMatch(/timeout[\s\S]*consume/iu);
+    expect(source).toMatch(/HMAC[\s\S]*version/iu);
+    expect(source).toMatch(/credential overlap/iu);
+    expect(source).toMatch(/raw IP/iu);
+    expect(source).toMatch(/India[\s\S]*cross-border/iu);
+    expect(source).toMatch(/rollback/iu);
+    expect(source).toMatch(/both[\s\S]*gates[\s\S]*disabled/iu);
+  });
 });
