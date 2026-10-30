@@ -44,6 +44,16 @@ it("changes the real listing intent from the header navigation", async () => {
   expect(screen.getByRole("status")).toHaveTextContent("2 properties found");
 });
 
+it("filters published results as the location search changes", async () => {
+  const user = userEvent.setup();
+  renderHome();
+
+  await user.type(screen.getByRole("searchbox", { name: /search location/i }), "Dharampeth");
+
+  expect(screen.getByRole("status")).toHaveTextContent("1 property found");
+  expect(screen.getAllByTestId("property-card")).toHaveLength(1);
+});
+
 it("keeps all ordinary-filter markers while map bounds narrow listings", async () => {
   const user = userEvent.setup();
   renderHome();

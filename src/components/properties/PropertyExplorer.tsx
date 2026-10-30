@@ -70,7 +70,7 @@ export function PropertyExplorer({ accountControl, initialProperties, inventoryM
   return (
     <>
       <Header accountControl={accountControl} currentIntent={filters.intent} onIntentChange={(intent) => setFilters((current) => ({ ...current, intent, maxPrice: null }))} />
-      <PropertyFilters onChange={setFilters} onSearch={() => undefined} value={filters} />
+      <PropertyFilters onChange={setFilters} value={filters} />
       <main aria-label="Nagpur property results" className="bg-white lg:p-3">
         {inventoryMode === "demo" && (
           <div aria-label="Demo listings notice" className="mx-auto mb-1 max-w-[1536px] border border-red-100 bg-red-50 px-4 py-2.5 text-sm text-zinc-700 lg:rounded-lg" role="status">
