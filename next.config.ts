@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {
+    turbopackPluginRuntimeStrategy: "workerThreads",
     serverActions: {
       // Property images are validated again at 5 MiB in the action. The small
       // overhead allowance keeps valid multipart uploads below this hard cap.
