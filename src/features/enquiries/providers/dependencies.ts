@@ -13,7 +13,7 @@ import { createHmacRateLimitKeyDeriver } from "./hmac-rate-limit-key";
 import { createUpstashDistributedRateLimiter } from "./upstash-distributed-rate-limiter";
 import { createVercelTrustedClientIpResolver } from "./vercel-trusted-client-ip";
 
-const unconfiguredDependencies: EnquiryAbuseDependencies = {
+export const unconfiguredDependencies: EnquiryAbuseDependencies = {
   resolver: unconfiguredTrustedClientIpResolver,
   keyDeriver: unconfiguredRateLimitKeyDeriver,
   limiter: unconfiguredDistributedRateLimiter,
@@ -21,6 +21,10 @@ const unconfiguredDependencies: EnquiryAbuseDependencies = {
 };
 
 type ProviderEnvironment = Readonly<Record<string, string | undefined>>;
+
+export type EnquiryAbuseDependenciesOptions = {
+  readonly injected?: EnquiryAbuseDependencies;
+};
 
 function validConfiguration(environment: ProviderEnvironment) {
   if (
@@ -49,7 +53,22 @@ function validConfiguration(environment: ProviderEnvironment) {
 
 export function createEnquiryAbuseDependencies(
   environment: ProviderEnvironment = process.env,
+  options?: EnquiryAbuseDependenciesOptions,
 ): EnquiryAbuseDependencies {
+  if (options?.injected) {
+    if (
+      environment.NODE_ENV === "production" ||
+      environment.VERCEL_ENV === "production" ||
+      process.env.NODE_ENV === "production" ||
+      process.env.VERCEL_ENV === "production"
+    ) {
+      throw new Error(
+        "SAT12_ENQUIRY_INJECTED_DEPENDENCIES_FORBIDDEN_IN_PRODUCTION",
+      );
+    }
+    return options.injected;
+  }
+
   if (!validConfiguration(environment)) return unconfiguredDependencies;
 
   const redis = new Redis({

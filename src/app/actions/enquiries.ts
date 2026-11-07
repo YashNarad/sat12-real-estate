@@ -7,20 +7,29 @@ import {
   hasRecentMfa,
   requireUser,
 } from "@/features/auth/authorization";
-import { createEnquiryAbuseDependencies } from "@/features/enquiries/providers/dependencies";
+import type { EnquiryAbuseDependencies } from "@/features/enquiries/abuse-protection";
+import {
+  createEnquiryAbuseDependencies,
+  unconfiguredDependencies,
+} from "@/features/enquiries/providers/dependencies";
 import { createEnquiryService, type EnquiryResult } from "@/features/enquiries/service";
 import { submitPublicEnquiry } from "@/features/enquiries/submission";
 import { createServerClient } from "@/lib/supabase/server";
 
-export async function createEnquiryAction(_state: EnquiryResult, formData: FormData): Promise<EnquiryResult> {
+export async function createEnquiryAction(
+  _state: EnquiryResult,
+  formData: FormData,
+  dependenciesOverride?: EnquiryAbuseDependencies,
+): Promise<EnquiryResult> {
   const enabled = process.env.SAT12_ENQUIRIES_ENABLED === "true";
   const requestHeaders = enabled ? await headers() : new Headers();
-  const dependencies = enabled ? createEnquiryAbuseDependencies() : {
-    resolver: { async resolve() { return { status: "unavailable" as const, reason: "unconfigured" as const }; } },
-    keyDeriver: { async derive() { return { status: "unavailable" as const, reason: "unconfigured" as const }; } },
-    limiter: { async consume() { return { status: "unavailable" as const, reason: "unconfigured" as const }; } },
-    metrics: { record() {} },
-  };
+  const dependencies = enabled
+    ? createEnquiryAbuseDependencies(
+        process.env,
+        dependenciesOverride ? { injected: dependenciesOverride } : undefined,
+      )
+    : unconfiguredDependencies;
+
   return submitPublicEnquiry({
     enabled,
     headers: requestHeaders,

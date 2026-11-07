@@ -26,8 +26,14 @@ vi.mock("@upstash/redis", () => ({
   },
 }));
 
-import { ENQUIRY_RATE_LIMIT_POLICY } from "../abuse-protection";
-import { createEnquiryAbuseDependencies } from "./dependencies";
+import {
+  ENQUIRY_RATE_LIMIT_POLICY,
+  type EnquiryAbuseDependencies,
+} from "../abuse-protection";
+import {
+  createEnquiryAbuseDependencies,
+  unconfiguredDependencies,
+} from "./dependencies";
 
 const completeEnvironment = {
   SAT12_ENQUIRY_ABUSE_PROVIDER: "vercel-upstash",
@@ -38,6 +44,15 @@ const completeEnvironment = {
   VERCEL: "1",
   VERCEL_ENV: "production",
 } as const;
+
+function mockDependencies(): EnquiryAbuseDependencies {
+  return {
+    resolver: { resolve: vi.fn(async () => ({ status: "trusted" as const, ip: "198.51.100.1" })) },
+    keyDeriver: { derive: vi.fn(async () => ({ status: "derived" as const, key: "mock-key" })) },
+    limiter: { consume: vi.fn(async () => ({ status: "allowed" as const })) },
+    metrics: { record: vi.fn(async () => undefined) },
+  };
+}
 
 describe("enquiry abuse dependency factory", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -82,5 +97,41 @@ describe("enquiry abuse dependency factory", () => {
     expect(upstash.constructor).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(dependencies)).not.toContain(completeEnvironment.UPSTASH_REDIS_REST_TOKEN);
     expect(JSON.stringify(dependencies)).not.toContain(completeEnvironment.SAT12_RATE_LIMIT_HMAC_KEY);
+  });
+
+  it("exports unconfiguredDependencies as fail-closed default", () => {
+    expect(unconfiguredDependencies.resolver).toBeDefined();
+    expect(unconfiguredDependencies.keyDeriver).toBeDefined();
+    expect(unconfiguredDependencies.limiter).toBeDefined();
+    expect(unconfiguredDependencies.metrics).toBeDefined();
+  });
+
+  it("accepts injected dependencies in test/non-production environments", () => {
+    const injected = mockDependencies();
+    const dependencies = createEnquiryAbuseDependencies(
+      { NODE_ENV: "test", VERCEL_ENV: undefined },
+      { injected },
+    );
+    expect(dependencies).toBe(injected);
+  });
+
+  it("strictly forbids injected dependencies when VERCEL_ENV is production", () => {
+    const injected = mockDependencies();
+    expect(() =>
+      createEnquiryAbuseDependencies(
+        { ...completeEnvironment, VERCEL_ENV: "production" },
+        { injected },
+      ),
+    ).toThrow("SAT12_ENQUIRY_INJECTED_DEPENDENCIES_FORBIDDEN_IN_PRODUCTION");
+  });
+
+  it("strictly forbids injected dependencies when NODE_ENV is production", () => {
+    const injected = mockDependencies();
+    expect(() =>
+      createEnquiryAbuseDependencies(
+        { NODE_ENV: "production" },
+        { injected },
+      ),
+    ).toThrow("SAT12_ENQUIRY_INJECTED_DEPENDENCIES_FORBIDDEN_IN_PRODUCTION");
   });
 });
