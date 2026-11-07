@@ -44,6 +44,7 @@ describe("ManagementPortalShell", () => {
     renderShell("admin");
     expect(screen.getAllByRole("link", { name: "Property moderation" })).not.toHaveLength(0);
     expect(screen.getAllByRole("link", { name: "User approvals" })).not.toHaveLength(0);
+    expect(screen.getAllByRole("link", { name: "Buyer enquiries" })).not.toHaveLength(0);
     expect(screen.queryByRole("link", { name: "My properties" })).not.toBeInTheDocument();
     expect(screen.getByText(/aal2/i)).toBeInTheDocument();
   });

@@ -15,6 +15,7 @@ const links: PortalLink[] = [
   { href: "/dashboard/enquiries", icon: Inbox, label: "Buyer enquiries", roles: ["owner_agent"] },
   { href: "/admin/listings", icon: ShieldCheck, label: "Property moderation", roles: ["admin"] },
   { href: "/admin/users", icon: Users, label: "User approvals", roles: ["admin"] },
+  { href: "/admin/enquiries", icon: Inbox, label: "Buyer enquiries", roles: ["admin"] },
   { href: "/account", icon: UserCog, label: "Account settings" },
   { href: "/auth/mfa?next=%2Fdashboard", icon: ShieldCheck, label: "Security / MFA" },
 ];
@@ -43,6 +44,7 @@ function breadcrumbLabel(pathname: string) {
   if (pathname === "/dashboard/enquiries") return "Buyer enquiries";
   if (pathname === "/admin/listings") return "Property moderation";
   if (pathname === "/admin/users") return "User approvals";
+  if (pathname === "/admin/enquiries") return "Buyer enquiries";
   if (pathname === "/auth/mfa") return "Security / MFA";
   if (pathname === "/account") return "Account settings";
   return "Overview";

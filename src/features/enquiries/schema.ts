@@ -15,8 +15,10 @@ export const enquiryInputSchema = z.object({
 }).strict();
 
 export const enquiryStatusSchema = z.enum(["new", "contacted", "closed"]);
+export const adminEnquiryStatusSchema = z.enum(["new", "contacted", "closed", "spam"]);
 export type EnquiryInput = z.infer<typeof enquiryInputSchema>;
 export type EnquiryStatus = z.infer<typeof enquiryStatusSchema>;
+export type AdminEnquiryStatus = z.infer<typeof adminEnquiryStatusSchema>;
 
 export function enquiryFromFormData(formData: FormData) {
   return enquiryInputSchema.safeParse({

@@ -1,4 +1,4 @@
-import { ArrowUpRight, ShieldCheck, UserCog, Users } from "lucide-react";
+import { ArrowUpRight, Inbox, ShieldCheck, UserCog, Users } from "lucide-react";
 import Link from "next/link";
 
 import { requireAal2Admin } from "@/features/auth/authorization";
@@ -6,6 +6,7 @@ import { requireAal2Admin } from "@/features/auth/authorization";
 const destinations = [
   { href: "/admin/listings", icon: ShieldCheck, label: "Submitted properties", description: "Review submitted revisions and make audited lifecycle decisions." },
   { href: "/admin/users", icon: Users, label: "User approvals", description: "Approve eligible owner and agent accounts through the audited role workflow." },
+  { href: "/admin/enquiries", icon: Inbox, label: "Buyer enquiries", description: "Audit and monitor buyer enquiries submitted for published properties with AAL2 protection." },
   { href: "/account", icon: UserCog, label: "Account settings", description: "Review your authoritative profile and current security level." },
   { href: "/auth/mfa?next=%2Fadmin", icon: ShieldCheck, label: "Security / MFA", description: "Maintain the recent AAL2 session required by Admin tools." },
 ] as const;

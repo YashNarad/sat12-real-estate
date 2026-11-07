@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enquiryInputSchema, enquiryStatusSchema } from "./schema";
+import { adminEnquiryStatusSchema, enquiryInputSchema, enquiryStatusSchema } from "./schema";
 
 const valid = {
   propertyId: "11111111-1111-4111-8111-111111111111",
@@ -31,5 +31,12 @@ describe("enquiry validation", () => {
   it("accepts only owner-manageable statuses", () => {
     expect(enquiryStatusSchema.safeParse("contacted").success).toBe(true);
     expect(enquiryStatusSchema.safeParse("spam").success).toBe(false);
+  });
+
+  it("accepts all four database-backed statuses for admin auditing", () => {
+    for (const status of ["new", "contacted", "closed", "spam"]) {
+      expect(adminEnquiryStatusSchema.safeParse(status).success).toBe(true);
+    }
+    expect(adminEnquiryStatusSchema.safeParse("archived").success).toBe(false);
   });
 });

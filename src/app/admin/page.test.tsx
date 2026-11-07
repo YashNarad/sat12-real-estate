@@ -12,6 +12,7 @@ describe("AdminPage", () => {
     expect(screen.getByRole("heading", { name: "Administration overview" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /submitted properties/i })).toHaveAttribute("href", "/admin/listings");
     expect(screen.getByRole("link", { name: /user approvals/i })).toHaveAttribute("href", "/admin/users");
+    expect(screen.getByRole("link", { name: /buyer enquiries/i })).toHaveAttribute("href", "/admin/enquiries");
     expect(screen.getByRole("link", { name: /account settings/i })).toHaveAttribute("href", "/account");
     expect(screen.getByRole("link", { name: /security/i })).toHaveAttribute("href", "/auth/mfa?next=%2Fadmin");
   });
